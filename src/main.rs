@@ -1,8 +1,11 @@
-use std::{error::Error, sync::atomic};
+use std::{
+    error::Error,
+    sync::{atomic, mpsc},
+};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rust_audio::{generators::*, *};
+use rust_audio::{wave_generator::*, waves, *};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let host = cpal::default_host();
@@ -18,14 +21,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
 
-    let mut generator = SquareWaveGenerator::new(config.sample_rate.0);
-    let remote_pitch = generator.pitch.clone();
+    let generator_a = waves::Square::new();
+    let remote_pitch = generator_a.pitch.clone();
     let mut pitch = remote_pitch.load(atomic::Ordering::Relaxed) as f64;
+
+    let generator_b = waves::Sine::new();
+
+    let generator = generator_a + generator_b;
+
+    let (tx, rx) = mpsc::channel();
+
+    let mut streamer = WaveStreamer::new(Box::new(generator), Some(rx), config.sample_rate.0, None);
 
     let stream = device
         .build_output_stream(
             &config,
-            move |data: &mut [f32], _| generator.generate(data),
+            move |data: &mut [f32], _| streamer.generate(data),
             err_fn,
             None,
         )
