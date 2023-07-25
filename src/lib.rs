@@ -1,30 +1,41 @@
+#![feature(array_chunks)]
 use std::sync::mpsc;
 
 use cpal::{FromSample, Sample};
 use wave_generator::WaveSource;
 
+mod variable;
 pub mod wave_generator;
 pub mod waves;
 
+pub use crate::variable::Variable;
+
+type Generator = Box<dyn WaveSource + Send>;
+
 pub struct WaveStreamer {
-    wave_generator: Box<dyn WaveSource + Send>,
-    wave_generator_update_channel: Option<mpsc::Receiver<Box<dyn WaveSource + Send>>>,
-    sample_rate: u32,
-    sample_rate_update_channel: Option<mpsc::Receiver<u32>>,
+    wave_generator_l: Variable<Generator>,
+    wave_generator_r: Variable<Generator>,
+    sample_rate: Variable<u32>,
 }
 
 impl WaveStreamer {
-    pub fn new(
-        wave_generator: Box<dyn WaveSource + Send>,
-        wave_generator_update_channel: Option<mpsc::Receiver<Box<dyn WaveSource + Send>>>,
-        sample_rate: u32,
-        sample_rate_update_channel: Option<mpsc::Receiver<u32>>,
+    pub fn new(wave_generator_l: Generator, wave_generator_r: Generator, sample_rate: u32) -> Self {
+        Self {
+            wave_generator_l: Variable::new(wave_generator_l).0,
+            wave_generator_r: Variable::new(wave_generator_r).0,
+            sample_rate: Variable::new(sample_rate).0,
+        }
+    }
+
+    pub fn new_var(
+        wave_generator_l: Variable<Generator>,
+        wave_generator_r: Variable<Generator>,
+        sample_rate: Variable<u32>,
     ) -> Self {
         Self {
-            wave_generator,
-            wave_generator_update_channel,
+            wave_generator_l,
+            wave_generator_r,
             sample_rate,
-            sample_rate_update_channel,
         }
     }
 
@@ -32,20 +43,13 @@ impl WaveStreamer {
     where
         T: Sample + FromSample<f64>,
     {
-        if let Some(chan) = &mut self.wave_generator_update_channel {
-            if let Ok(wave_generator) = chan.try_recv() {
-                self.wave_generator = wave_generator;
-            }
-        }
+        self.wave_generator_l.update();
+        self.wave_generator_r.update();
+        self.sample_rate.update();
 
-        if let Some(chan) = &mut self.sample_rate_update_channel {
-            if let Ok(sample_rate) = chan.try_recv() {
-                self.sample_rate = sample_rate;
-            }
-        }
-
-        for sample in buffer.iter_mut() {
-            *sample = Sample::from_sample(self.wave_generator.next_sample(self.sample_rate));
+        for [sample_l, sample_r] in buffer.array_chunks_mut() {
+            *sample_l = Sample::from_sample(self.wave_generator_l.next_sample());
+            *sample_r = Sample::from_sample(self.wave_generator_r.next_sample());
         }
     }
 }
