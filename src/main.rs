@@ -2,7 +2,7 @@ use std::error::Error;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rust_audio_shenanigans::{wave_generator::*, waves, *};
+use rust_audio_shenanigans::{waves, *};
 
 fn setup_device() -> Result<(cpal::Device, cpal::StreamConfig), Box<dyn Error>> {
     let host = cpal::default_host();
@@ -33,7 +33,7 @@ fn setup_stream(
     let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
 
     let stream = device.build_output_stream(
-        &config,
+        config,
         move |data: &mut [f32], _| streamer.generate(data),
         err_fn,
         None,
