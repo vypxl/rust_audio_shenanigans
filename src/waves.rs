@@ -1,10 +1,4 @@
-use std::{
-    f64::consts::PI,
-    sync::{
-        atomic::{self, AtomicU32},
-        Arc,
-    },
-};
+use std::f64::consts::TAU;
 
 use crate::{
     variable::{VariableSetter, VariableUpdater},
@@ -57,50 +51,48 @@ impl WaveSource for VariableConstant {
     }
 }
 
-pub struct Sine {
+pub struct Sine<T: WaveSource> {
     state: GeneratorState,
-    pub pitch: Arc<AtomicU32>,
+    pub pitch: T,
 }
 
-impl Sine {
-    pub fn new() -> WaveGenerator<Self> {
+impl<T: WaveSource> Sine<T> {
+    pub fn new(pitch_source: T) -> WaveGenerator<Self> {
         Self {
             state: GeneratorState { phase: 0.0 },
-            pitch: Arc::new(440.into()),
+            pitch: pitch_source,
         }
         .into()
     }
 }
 
-impl WaveSource for Sine {
+impl<T: WaveSource> WaveSource for Sine<T> {
     fn next_sample(&mut self) -> f64 {
-        let increase = (self.pitch.load(atomic::Ordering::Relaxed) as f64 * 2.0 * PI)
-            / self.sample_rate() as f64;
+        let increase = (self.pitch.next_sample() * TAU) / self.sample_rate() as f64;
         self.state.phase += increase;
-        self.state.phase %= 2.0 * PI;
+        self.state.phase %= TAU;
         self.state.phase.sin()
     }
 }
 
-pub struct Square {
+pub struct Square<T: WaveSource> {
     state: GeneratorState,
-    pub pitch: Arc<AtomicU32>,
+    pub pitch: T,
 }
 
-impl Square {
-    pub fn new() -> WaveGenerator<Self> {
+impl<T: WaveSource> Square<T> {
+    pub fn new(pitch_source: T) -> WaveGenerator<Self> {
         Self {
             state: GeneratorState { phase: 0.0 },
-            pitch: Arc::new(440.into()),
+            pitch: pitch_source,
         }
         .into()
     }
 }
 
-impl WaveSource for Square {
+impl<T: WaveSource> WaveSource for Square<T> {
     fn next_sample(&mut self) -> f64 {
-        let increase =
-            self.pitch.load(atomic::Ordering::Relaxed) as f64 / self.sample_rate() as f64;
+        let increase = self.pitch.next_sample() / self.sample_rate() as f64;
         self.state.phase += increase;
         self.state.phase %= 1.0;
         if self.state.phase < 0.5 {
@@ -125,10 +117,10 @@ pub fn var_dyn<T: Into<f64>>(
     VariableConstant::new_dynamic(value)
 }
 
-pub fn sine() -> WaveGenerator<Sine> {
-    Sine::new()
+pub fn sine<T: WaveSource>(pitch_source: T) -> WaveGenerator<Sine<T>> {
+    Sine::new(pitch_source)
 }
 
-pub fn square() -> WaveGenerator<Square> {
-    Square::new()
+pub fn square<T: WaveSource>(pitch_source: T) -> WaveGenerator<Square<T>> {
+    Square::new(pitch_source)
 }

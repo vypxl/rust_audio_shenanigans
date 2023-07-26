@@ -43,14 +43,14 @@ fn setup_stream(
 }
 
 fn setup_streamer(sample_rate: u32) -> WaveStreamer {
-    let generator_a = waves::square();
+    let generator_a = waves::square(waves::constant(440.0));
 
-    let (mul, update_mul) = waves::var_dyn(1.0);
-    let generator_b = waves::square() * mul;
+    let (pitch, update_pitch) = waves::var_dyn(1.0);
+    let generator_b = waves::square(pitch);
 
     std::thread::spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        update_mul(Box::new(|v| *v *= -1.0));
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        update_pitch(Box::new(|v| *v += 1.0));
     });
 
     WaveStreamer::new(Box::new(generator_a), Box::new(generator_b), sample_rate)
