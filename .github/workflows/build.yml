@@ -1,4 +1,4 @@
-name: Rust Build & Test
+name: Rust Check, Build & Test
 on:
   push:
     branches:
@@ -7,12 +7,27 @@ on:
     branches:
       - main
 jobs:
+  check:
+    name: Check format & run linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: Check format
+        run: cargo fmt --all -- --check
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
   build:
     name: Build & Test
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [nightly]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -20,19 +35,12 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: nightly
           override: true
-          components: rustfmt, clippy
       - name: Install Dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - name: Check
-        run: cargo check --verbose
-      - name: Check format
-        run: cargo fmt --all -- --check
-      - name: Run clippy
-        run: cargo clippy -- -D warnings
-      - name: Build
         run: cargo build --verbose
       - name: Test
         run: cargo test --verbose
