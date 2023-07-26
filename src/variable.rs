@@ -1,47 +1,107 @@
 use std::{
     ops::{Deref, DerefMut},
-    sync::mpsc::{Receiver, SendError, Sender},
+    sync::mpsc::Receiver,
 };
 
-pub struct Variable<T> {
-    pub value: T,
-    rx: Receiver<T>,
+pub enum Variable<T> {
+    Static {
+        value: T,
+        rx: Receiver<T>,
+    },
+    Dynamic {
+        value: T,
+        rx: Receiver<Box<dyn FnOnce(&mut T) + Send>>,
+    },
 }
 
-pub struct VariableUpdater<T> {
-    tx: Sender<T>,
+pub trait VariableSetter<T>: Fn(T) {}
+impl<T: Fn(U), U> VariableSetter<U> for T {}
+
+pub trait VariableUpdater<T>: Fn(Box<dyn FnOnce(&mut T) + Send>) {}
+impl<T: Fn(Box<dyn FnOnce(&mut U) + Send>) + 'static, U> VariableUpdater<U> for T {}
+
+impl<T: 'static> Variable<T> {
+    pub fn new_dynamic(value: T) -> (Self, impl VariableUpdater<T>) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        (
+            Self::Dynamic { value, rx },
+            move |t: Box<dyn FnOnce(&mut T) + Send>| {
+                // Ignoring this error, because it's not important. The send only fails, if the
+                // receiver is dropped, and that only happens, if the audio thread dies. This is easily
+                // detectable.
+                let _ = tx.send(t);
+            },
+        )
+    }
 }
 
 impl<T> Variable<T> {
-    pub fn new(value: T) -> (Self, VariableUpdater<T>) {
+    pub fn new(value: T) -> (Self, impl VariableSetter<T>) {
         let (tx, rx) = std::sync::mpsc::channel();
-        (Self { value, rx }, VariableUpdater { tx })
+        (Self::Static { value, rx }, move |t: T| {
+            // Ignoring this error, because it's not important. The send only fails, if the
+            // receiver is dropped, and that only happens, if the audio thread dies. This is easily
+            // detectable.
+            let _ = tx.send(t);
+        })
+    }
+
+    pub fn value(&self) -> &T {
+        match self {
+            Self::Static { value, .. } => value,
+            Self::Dynamic { value, .. } => value,
+        }
+    }
+
+    pub fn value_mut(&mut self) -> &mut T {
+        match self {
+            Self::Static { value, .. } => value,
+            Self::Dynamic { value, .. } => value,
+        }
     }
 
     pub fn update(&mut self) -> &T {
-        while let Ok(value) = self.rx.try_recv() {
-            self.value = value;
+        match self {
+            Self::Static { value, rx } => {
+                while let Ok(new_value) = rx.try_recv() {
+                    *value = new_value;
+                }
+                value
+            }
+            Self::Dynamic { value, rx } => {
+                while let Ok(updater) = rx.try_recv() {
+                    updater(value);
+                }
+                value
+            }
         }
-
-        &self.value
     }
 
     pub fn update_once(&mut self) -> &T {
-        if let Ok(value) = self.rx.try_recv() {
-            self.value = value;
+        match self {
+            Self::Static { value, rx } => {
+                if let Ok(new_value) = rx.try_recv() {
+                    *value = new_value;
+                }
+                value
+            }
+            Self::Dynamic { value, rx } => {
+                if let Ok(updater) = rx.try_recv() {
+                    updater(value);
+                }
+                value
+            }
         }
-
-        &self.value
     }
 
     pub fn update_mut(&mut self) -> &mut T {
         self.update();
-        &mut self.value
+        self.value_mut()
     }
 
     pub fn update_once_mut(&mut self) -> &mut T {
         self.update_once();
-        &mut self.value
+        self.value_mut()
     }
 }
 
@@ -51,22 +111,22 @@ impl<T> From<T> for Variable<T> {
     }
 }
 
-impl<T> VariableUpdater<T> {
-    pub fn update(&self, value: T) -> Result<(), SendError<T>> {
-        self.tx.send(value)
-    }
-}
-
 impl<T> Deref for Variable<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.value
+        match self {
+            Self::Static { value, .. } => value,
+            Self::Dynamic { value, .. } => value,
+        }
     }
 }
 
 impl<T> DerefMut for Variable<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.value
+        match self {
+            Self::Static { value, .. } => value,
+            Self::Dynamic { value, .. } => value,
+        }
     }
 }

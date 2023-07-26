@@ -1,5 +1,4 @@
 #![feature(array_chunks)]
-use std::sync::mpsc;
 
 use cpal::{FromSample, Sample};
 use wave_generator::WaveSource;

@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    variable::VariableUpdater,
+    variable::{VariableSetter, VariableUpdater},
     wave_generator::{WaveGenerator, WaveSource},
     Variable,
 };
@@ -40,8 +40,13 @@ pub struct VariableConstant {
 }
 
 impl VariableConstant {
-    pub fn new<T: Into<f64>>(value: T) -> (WaveGenerator<Self>, VariableUpdater<f64>) {
+    pub fn new<T: Into<f64>>(value: T) -> (WaveGenerator<Self>, impl VariableSetter<f64>) {
         let (var, updater) = Variable::new(value.into());
+        (Self { value: var }.into(), updater)
+    }
+
+    pub fn new_dynamic<T: Into<f64>>(value: T) -> (WaveGenerator<Self>, impl VariableUpdater<f64>) {
+        let (var, updater) = Variable::new_dynamic(value.into());
         (Self { value: var }.into(), updater)
     }
 }
@@ -102,10 +107,24 @@ impl WaveSource for Square {
     }
 }
 
-fn sine() -> WaveGenerator<Sine> {
-    return Sine::new();
+pub fn constant<T: Into<f64>>(value: T) -> WaveGenerator<Constant> {
+    Constant::new(value)
 }
 
-fn square() -> WaveGenerator<Square> {
-    return Square::new();
+pub fn var<T: Into<f64>>(value: T) -> (WaveGenerator<VariableConstant>, impl VariableSetter<f64>) {
+    VariableConstant::new(value)
+}
+
+pub fn var_dyn<T: Into<f64>>(
+    value: T,
+) -> (WaveGenerator<VariableConstant>, impl VariableUpdater<f64>) {
+    VariableConstant::new_dynamic(value)
+}
+
+pub fn sine() -> WaveGenerator<Sine> {
+    Sine::new()
+}
+
+pub fn square() -> WaveGenerator<Square> {
+    Square::new()
 }

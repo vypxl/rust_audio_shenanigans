@@ -1,7 +1,4 @@
-use std::{
-    error::Error,
-    sync::{atomic, mpsc},
-};
+use std::error::Error;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -46,18 +43,14 @@ fn setup_stream(
 }
 
 fn setup_streamer(sample_rate: u32) -> WaveStreamer {
-    let generator_a = waves::Square::new();
+    let generator_a = waves::square();
 
-    let (mul, mul_up) = waves::VariableConstant::new(1.0);
-    let generator_b = waves::Square::new() * mul;
+    let (mul, update_mul) = waves::var_dyn(1.0);
+    let generator_b = waves::square() * mul;
 
-    std::thread::spawn(move || {
-        let mut local_mul = 1.0;
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            mul_up.update(local_mul).unwrap();
-            local_mul *= -1.0;
-        }
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        update_mul(Box::new(|v| *v *= -1.0));
     });
 
     WaveStreamer::new(Box::new(generator_a), Box::new(generator_b), sample_rate)
