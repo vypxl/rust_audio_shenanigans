@@ -2,7 +2,7 @@ use std::error::Error;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rust_audio::{wave_generator::*, waves, *};
+use rust_audio_shenanigans::{wave_generator::*, waves, *};
 
 fn setup_device() -> Result<(cpal::Device, cpal::StreamConfig), Box<dyn Error>> {
     let host = cpal::default_host();
