@@ -6,10 +6,6 @@ use crate::{
     Variable,
 };
 
-struct GeneratorState {
-    pub phase: f64,
-}
-
 pub struct Constant {
     pub value: f64,
 }
@@ -51,60 +47,42 @@ impl WaveSource for VariableConstant {
     }
 }
 
-pub struct Sine<T: WaveSource> {
-    state: GeneratorState,
-    pub pitch: T,
+pub struct Oscillator<T: WaveSource> {
+    phase: f64,
+    pitch: T,
+    process: fn(f64) -> f64,
 }
 
-impl<T: WaveSource> Sine<T> {
-    pub fn new(pitch_source: T) -> WaveGenerator<Self> {
+impl<T: WaveSource> Oscillator<T> {
+    pub fn new(process: fn(f64) -> f64, pitch_source: T) -> WaveGenerator<Self> {
         Self {
-            state: GeneratorState { phase: 0.0 },
+            phase: 0.0,
             pitch: pitch_source,
+            process,
         }
         .into()
     }
 }
 
-impl<T: WaveSource> WaveSource for Sine<T> {
-    fn next_sample(&mut self) -> f64 {
-        let increase = (self.pitch.next_sample() * TAU) / self.sample_rate() as f64;
-        self.state.phase += increase;
-        self.state.phase %= TAU;
-        self.state.phase.sin()
     }
 }
 
-pub struct Square<T: WaveSource> {
-    state: GeneratorState,
-    pub pitch: T,
-}
-
-impl<T: WaveSource> Square<T> {
-    pub fn new(pitch_source: T) -> WaveGenerator<Self> {
-        Self {
-            state: GeneratorState { phase: 0.0 },
-            pitch: pitch_source,
-        }
-        .into()
-    }
-}
-
-impl<T: WaveSource> WaveSource for Square<T> {
+impl<T: WaveSource> WaveSource for Oscillator<T> {
     fn next_sample(&mut self) -> f64 {
         let increase = self.pitch.next_sample() / self.sample_rate() as f64;
-        self.state.phase += increase;
-        self.state.phase %= 1.0;
-        if self.state.phase < 0.5 {
-            1.0
-        } else {
-            -1.0
-        }
+        self.phase += increase;
+        self.phase %= 1.0;
+
+        (self.process)(self.phase)
     }
 }
 
 pub fn constant<T: Into<f64>>(value: T) -> WaveGenerator<Constant> {
     Constant::new(value)
+}
+
+pub fn silence() -> WaveGenerator<Constant> {
+    constant(0.0)
 }
 
 pub fn var<T: Into<f64>>(value: T) -> (WaveGenerator<VariableConstant>, impl VariableSetter<f64>) {
@@ -117,10 +95,27 @@ pub fn var_dyn<T: Into<f64>>(
     VariableConstant::new_dynamic(value)
 }
 
-pub fn sine<T: WaveSource>(pitch_source: T) -> WaveGenerator<Sine<T>> {
-    Sine::new(pitch_source)
+pub fn sine<T: WaveSource>(pitch_source: T) -> WaveGenerator<Oscillator<T>> {
+    Oscillator::new(|phase| (phase * TAU).sin(), pitch_source)
 }
 
-pub fn square<T: WaveSource>(pitch_source: T) -> WaveGenerator<Square<T>> {
-    Square::new(pitch_source)
+pub fn square<T: WaveSource>(pitch_source: T) -> WaveGenerator<Oscillator<T>> {
+    Oscillator::new(|phase| if phase < 0.5 { 0.0 } else { 1.0 }, pitch_source)
+}
+
+pub fn sawtooth<T: WaveSource>(pitch_source: T) -> WaveGenerator<Oscillator<T>> {
+    Oscillator::new(|phase| phase, pitch_source)
+}
+
+pub fn triangle<T: WaveSource>(pitch_source: T) -> WaveGenerator<Oscillator<T>> {
+    Oscillator::new(
+        |phase| {
+            if phase < 0.5 {
+                phase * 4.0 - 1.0
+            } else {
+                3.0 - phase * 4.0
+            }
+        },
+        pitch_source,
+    )
 }

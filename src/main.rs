@@ -43,10 +43,11 @@ fn setup_stream(
 }
 
 fn setup_streamer(sample_rate: u32) -> WaveStreamer {
-    let generator_a = waves::square(waves::constant(440.0));
+    let generator_a = waves::silence(); // triangle(waves::constant(440.0));
 
     let (pitch, update_pitch) = waves::var_dyn(1.0);
-    let generator_b = waves::square(pitch);
+    let s = waves::sine(waves::constant(0.2)) * 200 + 650.0;
+    let generator_b = waves::triangle(s);
 
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
