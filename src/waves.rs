@@ -31,7 +31,7 @@ impl Constant {
 
 impl WaveSource for Constant {
     fn next_sample(&mut self) -> f64 {
-        return self.value;
+        self.value
     }
 }
 
@@ -53,7 +53,7 @@ impl VariableConstant {
 
 impl WaveSource for VariableConstant {
     fn next_sample(&mut self) -> f64 {
-        return *self.value.update();
+        *self.value.update()
     }
 }
 
@@ -78,7 +78,7 @@ impl WaveSource for Sine {
             / self.sample_rate() as f64;
         self.state.phase += increase;
         self.state.phase %= 2.0 * PI;
-        return self.state.phase.sin();
+        self.state.phase.sin()
     }
 }
 
@@ -103,7 +103,11 @@ impl WaveSource for Square {
             self.pitch.load(atomic::Ordering::Relaxed) as f64 / self.sample_rate() as f64;
         self.state.phase += increase;
         self.state.phase %= 1.0;
-        return if self.state.phase < 0.5 { 1.0 } else { -1.0 };
+        if self.state.phase < 0.5 {
+            1.0
+        } else {
+            -1.0
+        }
     }
 }
 

@@ -3,6 +3,8 @@ use std::{
     sync::mpsc::Receiver,
 };
 
+type UpdateFun<T> = Box<dyn FnOnce(&mut T) + Send>;
+
 pub enum Variable<T> {
     Static {
         value: T,
@@ -10,28 +12,25 @@ pub enum Variable<T> {
     },
     Dynamic {
         value: T,
-        rx: Receiver<Box<dyn FnOnce(&mut T) + Send>>,
+        rx: Receiver<UpdateFun<T>>,
     },
 }
 
 pub trait VariableSetter<T>: Fn(T) {}
 impl<T: Fn(U), U> VariableSetter<U> for T {}
 
-pub trait VariableUpdater<T>: Fn(Box<dyn FnOnce(&mut T) + Send>) {}
-impl<T: Fn(Box<dyn FnOnce(&mut U) + Send>) + 'static, U> VariableUpdater<U> for T {}
+pub trait VariableUpdater<T>: Fn(UpdateFun<T>) {}
+impl<T: Fn(UpdateFun<U>) + 'static, U> VariableUpdater<U> for T {}
 
 impl<T: 'static> Variable<T> {
     pub fn new_dynamic(value: T) -> (Self, impl VariableUpdater<T>) {
         let (tx, rx) = std::sync::mpsc::channel();
-        (
-            Self::Dynamic { value, rx },
-            move |t: Box<dyn FnOnce(&mut T) + Send>| {
-                // Ignoring this error, because it's not important. The send only fails, if the
-                // receiver is dropped, and that only happens, if the audio thread dies. This is easily
-                // detectable.
-                let _ = tx.send(t);
-            },
-        )
+        (Self::Dynamic { value, rx }, move |t: UpdateFun<T>| {
+            // Ignoring this error, because it's not important. The send only fails, if the
+            // receiver is dropped, and that only happens, if the audio thread dies. This is easily
+            // detectable.
+            let _ = tx.send(t);
+        })
     }
 }
 
