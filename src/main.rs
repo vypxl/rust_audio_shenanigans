@@ -43,16 +43,18 @@ fn setup_stream(
 }
 
 fn setup_streamer(sample_rate: u32) -> WaveStreamer {
-    let (_pitch, update_pitch) = waves::var_dyn(1.0);
+    let (_pitch, pitch_handle) = waves::var_dyn(1.0);
     let wave = (((constant(3) >> sine() >> triangle()) * 100 + 650) >> saw())
         * ((constant(10) >> sine()) + 0.5);
 
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
-        update_pitch(Box::new(|v| *v += 1.0));
+        if let Ok(mut pitch) = pitch_handle.lock() {
+            *pitch = 1.0;
+        }
     });
 
-    WaveStreamer::new(Box::new(wave.clone()), Box::new(wave), sample_rate)
+    WaveStreamer::new(wave.clone(), wave, sample_rate)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

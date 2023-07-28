@@ -3,7 +3,7 @@ use std::f64::consts::TAU;
 use crate::{
     oscillator::PartialOscillator,
     partial_wave::PartialWaveBuilder,
-    variable::{VariableSetter, VariableUpdater},
+    variable::{VariableHandle, VariableSetter},
     wave::{Wave, WaveGenerator},
 };
 
@@ -24,9 +24,7 @@ pub fn var<T: Into<f64>>(value: T) -> (WaveGenerator<VariableConstant>, impl Var
     VariableConstant::new(value)
 }
 
-pub fn var_dyn<T: Into<f64>>(
-    value: T,
-) -> (WaveGenerator<VariableConstant>, impl VariableUpdater<f64>) {
+pub fn var_dyn<T: Into<f64>>(value: T) -> (WaveGenerator<VariableConstant>, VariableHandle<f64>) {
     VariableConstant::new_dynamic(value)
 }
 

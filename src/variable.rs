@@ -1,42 +1,36 @@
 use std::{
     ops::{Deref, DerefMut},
-    sync::mpsc::Receiver,
+    sync::{Arc, Mutex},
 };
+use tokio::sync::watch::{channel, Receiver};
 
-type UpdateFun<T> = Box<dyn FnOnce(&mut T) + Send>;
-
+#[derive(Clone)]
 pub enum Variable<T> {
-    Static {
-        value: T,
-        rx: Receiver<T>,
-    },
-    Dynamic {
-        value: T,
-        rx: Receiver<UpdateFun<T>>,
-    },
+    Static { value: T, rx: Receiver<T> },
+    Dynamic { lock_value: Arc<Mutex<T>>, value: T },
 }
 
 pub trait VariableSetter<T>: Fn(T) {}
 impl<T: Fn(U), U> VariableSetter<U> for T {}
 
-pub trait VariableUpdater<T>: Fn(UpdateFun<T>) {}
-impl<T: Fn(UpdateFun<U>) + 'static, U> VariableUpdater<U> for T {}
+pub type VariableHandle<T> = Arc<Mutex<T>>;
 
-impl<T: 'static> Variable<T> {
-    pub fn new_dynamic(value: T) -> (Self, impl VariableUpdater<T>) {
-        let (tx, rx) = std::sync::mpsc::channel();
-        (Self::Dynamic { value, rx }, move |t: UpdateFun<T>| {
-            // Ignoring this error, because it's not important. The send only fails, if the
-            // receiver is dropped, and that only happens, if the audio thread dies. This is easily
-            // detectable.
-            let _ = tx.send(t);
-        })
+impl<T: 'static + Clone> Variable<T> {
+    pub fn new_dynamic(value: T) -> (Self, VariableHandle<T>) {
+        let lock_value = Arc::new(Mutex::new(value.clone()));
+        (
+            Self::Dynamic {
+                value: value.clone(),
+                lock_value: Arc::new(Mutex::new(value)).clone(),
+            },
+            lock_value,
+        )
     }
 }
 
-impl<T> Variable<T> {
+impl<T: Clone> Variable<T> {
     pub fn new(value: T) -> (Self, impl VariableSetter<T>) {
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = channel(value.clone());
         (Self::Static { value, rx }, move |t: T| {
             // Ignoring this error, because it's not important. The send only fails, if the
             // receiver is dropped, and that only happens, if the audio thread dies. This is easily
@@ -62,31 +56,16 @@ impl<T> Variable<T> {
     pub fn update(&mut self) -> &T {
         match self {
             Self::Static { value, rx } => {
-                while let Ok(new_value) = rx.try_recv() {
-                    *value = new_value;
+                if let Ok(has_changed) = rx.has_changed() {
+                    if has_changed {
+                        *value = rx.borrow_and_update().clone();
+                    }
                 }
                 value
             }
-            Self::Dynamic { value, rx } => {
-                while let Ok(updater) = rx.try_recv() {
-                    updater(value);
-                }
-                value
-            }
-        }
-    }
-
-    pub fn update_once(&mut self) -> &T {
-        match self {
-            Self::Static { value, rx } => {
-                if let Ok(new_value) = rx.try_recv() {
-                    *value = new_value;
-                }
-                value
-            }
-            Self::Dynamic { value, rx } => {
-                if let Ok(updater) = rx.try_recv() {
-                    updater(value);
+            Self::Dynamic { value, lock_value } => {
+                if let Ok(lock_value) = lock_value.lock() {
+                    *value = lock_value.clone();
                 }
                 value
             }
@@ -97,14 +76,9 @@ impl<T> Variable<T> {
         self.update();
         self.value_mut()
     }
-
-    pub fn update_once_mut(&mut self) -> &mut T {
-        self.update_once();
-        self.value_mut()
-    }
 }
 
-impl<T> From<T> for Variable<T> {
+impl<T: Clone> From<T> for Variable<T> {
     fn from(value: T) -> Self {
         Self::new(value).0
     }

@@ -1,5 +1,5 @@
 use crate::{
-    variable::{VariableSetter, VariableUpdater},
+    variable::{VariableHandle, VariableSetter},
     wave::{Wave, WaveGenerator},
     Variable,
 };
@@ -34,7 +34,7 @@ impl VariableConstant {
         (Self { value: var }.into(), updater)
     }
 
-    pub fn new_dynamic<T: Into<f64>>(value: T) -> (WaveGenerator<Self>, impl VariableUpdater<f64>) {
+    pub fn new_dynamic<T: Into<f64>>(value: T) -> (WaveGenerator<Self>, VariableHandle<f64>) {
         let (var, updater) = Variable::new_dynamic(value.into());
         (Self { value: var }.into(), updater)
     }
