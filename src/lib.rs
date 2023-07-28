@@ -1,7 +1,7 @@
 #![feature(array_chunks)]
 
 use cpal::{FromSample, Sample};
-use wave_generator::WaveSource;
+use wave_generator::Wave;
 
 mod variable;
 pub mod wave_generator;
@@ -9,7 +9,7 @@ pub mod waves;
 
 pub use crate::variable::Variable;
 
-type Generator = Box<dyn WaveSource + Send>;
+type Generator = Box<dyn Wave + Send>;
 
 pub struct WaveStreamer {
     wave_generator_l: Variable<Generator>,

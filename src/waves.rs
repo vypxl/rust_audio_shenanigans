@@ -1,11 +1,12 @@
-use std::f64::consts::TAU;
+use std::{f64::consts::TAU, ops::Shr};
 
 use crate::{
     variable::{VariableSetter, VariableUpdater},
-    wave_generator::{WaveGenerator, WaveSource},
+    wave_generator::{Wave, WaveGenerator},
     Variable,
 };
 
+#[derive(Clone)]
 pub struct Constant {
     pub value: f64,
 }
@@ -19,7 +20,7 @@ impl Constant {
     }
 }
 
-impl WaveSource for Constant {
+impl Wave for Constant {
     fn next_sample(&mut self) -> f64 {
         self.value
     }
@@ -41,39 +42,84 @@ impl VariableConstant {
     }
 }
 
-impl WaveSource for VariableConstant {
+impl Wave for VariableConstant {
     fn next_sample(&mut self) -> f64 {
         *self.value.update()
     }
 }
 
-pub struct Oscillator<T: WaveSource> {
+type WaveFn = fn(f64) -> f64;
+
+#[derive(Clone)]
+pub struct Oscillator<T: Wave> {
+    wave_fn: WaveFn,
     phase: f64,
-    pitch: T,
-    process: fn(f64) -> f64,
+    frequency: T,
 }
 
-impl<T: WaveSource> Oscillator<T> {
-    pub fn new(process: fn(f64) -> f64, pitch_source: T) -> WaveGenerator<Self> {
+impl<T: Wave> Oscillator<T> {
+    pub fn new(wave_fn: fn(f64) -> f64, frequency: T) -> WaveGenerator<Self> {
         Self {
+            wave_fn,
             phase: 0.0,
-            pitch: pitch_source,
-            process,
+            frequency,
         }
         .into()
     }
 }
 
-    }
-}
-
-impl<T: WaveSource> WaveSource for Oscillator<T> {
+impl<T: Wave> Wave for Oscillator<T> {
     fn next_sample(&mut self) -> f64 {
-        let increase = self.pitch.next_sample() / self.sample_rate() as f64;
+        let increase = self.frequency.next_sample() / self.sample_rate() as f64;
         self.phase += increase;
         self.phase %= 1.0;
 
-        (self.process)(self.phase)
+        (self.wave_fn)(self.phase)
+    }
+}
+
+pub struct PartialOscillator {
+    wave_fn: WaveFn,
+}
+
+pub trait PartialWave<W: Wave> {
+    type Target: Wave;
+    fn build(self, src: W) -> WaveGenerator<Self::Target>;
+}
+
+impl<W: Wave> PartialWave<W> for PartialOscillator {
+    type Target = Oscillator<W>;
+
+    fn build(self, src: W) -> WaveGenerator<Self::Target> {
+        Oscillator::new(self.wave_fn, src)
+    }
+}
+
+pub struct PartialWaveBuilder<W: Wave, T: PartialWave<W>> {
+    _w_marker: std::marker::PhantomData<W>,
+    partial: T,
+}
+
+impl<W: Wave, T: PartialWave<W>> From<T> for PartialWaveBuilder<W, T> {
+    fn from(partial: T) -> Self {
+        Self {
+            _w_marker: std::marker::PhantomData,
+            partial,
+        }
+    }
+}
+
+impl<W: Wave, T: PartialWave<W>> PartialWave<W> for PartialWaveBuilder<W, T> {
+    type Target = T::Target;
+    fn build(self, src: W) -> WaveGenerator<T::Target> {
+        self.partial.build(src)
+    }
+}
+
+impl<W: Wave, T: PartialWave<W>> Shr<T> for WaveGenerator<W> {
+    type Output = WaveGenerator<T::Target>;
+    fn shr(self, dest: T) -> Self::Output {
+        dest.build(self.source)
     }
 }
 
@@ -95,27 +141,33 @@ pub fn var_dyn<T: Into<f64>>(
     VariableConstant::new_dynamic(value)
 }
 
-pub fn sine<T: WaveSource>(pitch_source: T) -> WaveGenerator<Oscillator<T>> {
-    Oscillator::new(|phase| (phase * TAU).sin(), pitch_source)
+pub fn sine<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator> {
+    PartialOscillator {
+        wave_fn: |phase| (phase * TAU).sin(),
+    }
+    .into()
 }
 
-pub fn square<T: WaveSource>(pitch_source: T) -> WaveGenerator<Oscillator<T>> {
-    Oscillator::new(|phase| if phase < 0.5 { 0.0 } else { 1.0 }, pitch_source)
+pub fn square() -> PartialOscillator {
+    PartialOscillator {
+        wave_fn: |phase| if phase < 0.5 { 0.0 } else { 1.0 },
+    }
 }
 
-pub fn sawtooth<T: WaveSource>(pitch_source: T) -> WaveGenerator<Oscillator<T>> {
-    Oscillator::new(|phase| phase, pitch_source)
+pub fn saw() -> PartialOscillator {
+    PartialOscillator {
+        wave_fn: |phase| phase,
+    }
 }
 
-pub fn triangle<T: WaveSource>(pitch_source: T) -> WaveGenerator<Oscillator<T>> {
-    Oscillator::new(
-        |phase| {
+pub fn triangle() -> PartialOscillator {
+    PartialOscillator {
+        wave_fn: |phase| {
             if phase < 0.5 {
                 phase * 4.0 - 1.0
             } else {
                 3.0 - phase * 4.0
             }
         },
-        pitch_source,
-    )
+    }
 }

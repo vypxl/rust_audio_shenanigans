@@ -2,7 +2,7 @@ use std::error::Error;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rust_audio_shenanigans::{waves, *};
+use rust_audio_shenanigans::{waves::*, *};
 
 fn setup_device() -> Result<(cpal::Device, cpal::StreamConfig), Box<dyn Error>> {
     let host = cpal::default_host();
@@ -43,18 +43,16 @@ fn setup_stream(
 }
 
 fn setup_streamer(sample_rate: u32) -> WaveStreamer {
-    let generator_a = waves::silence(); // triangle(waves::constant(440.0));
-
-    let (pitch, update_pitch) = waves::var_dyn(1.0);
-    let s = waves::sine(waves::constant(0.2)) * 200 + 650.0;
-    let generator_b = waves::triangle(s);
+    let (_pitch, update_pitch) = waves::var_dyn(1.0);
+    let wave = (((constant(3) >> sine() >> triangle()) * 100 + 650) >> saw())
+        * ((constant(10) >> sine()) + 0.5);
 
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
         update_pitch(Box::new(|v| *v += 1.0));
     });
 
-    WaveStreamer::new(Box::new(generator_a), Box::new(generator_b), sample_rate)
+    WaveStreamer::new(Box::new(wave.clone()), Box::new(wave), sample_rate)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
