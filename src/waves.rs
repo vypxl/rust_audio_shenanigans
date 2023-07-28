@@ -7,9 +7,11 @@ use crate::{
     wave::{Wave, WaveGenerator},
 };
 
+mod adsr;
 mod constant;
 pub mod misc;
 
+pub use adsr::ADSR;
 pub use constant::{Constant, VariableConstant};
 
 pub fn constant<T: Into<f64>>(value: T) -> WaveGenerator<Constant> {

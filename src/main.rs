@@ -44,14 +44,17 @@ fn setup_stream(
 
 fn setup_streamer(sample_rate: u32) -> WaveStreamer {
     let (_pitch, pitch_handle) = waves::var_dyn(1.0);
-    let wave = (((constant(3) >> sine() >> triangle()) * 100 + 650) >> saw())
-        * ((constant(10) >> sine()) + 0.5);
+    let wave = (((constant(20) >> sine() >> triangle()) * 100 + 650) >> saw())
+        * ((constant(80) >> sine()) + 0.5);
+    let (adsr, trigger) = ADSR::new(0.03, 0.1, 0.8, 0.2);
+    let wave = wave * adsr;
 
     std::thread::spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(std::time::Duration::from_millis(461));
         if let Ok(mut pitch) = pitch_handle.write() {
             *pitch = 1.0;
         }
+        trigger();
     });
 
     WaveStreamer::new(wave.clone(), wave, sample_rate)
