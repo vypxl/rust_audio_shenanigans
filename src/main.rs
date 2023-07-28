@@ -49,7 +49,7 @@ fn setup_streamer(sample_rate: u32) -> WaveStreamer {
 
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
-        if let Ok(mut pitch) = pitch_handle.lock() {
+        if let Ok(mut pitch) = pitch_handle.write() {
             *pitch = 1.0;
         }
     });

@@ -1,27 +1,33 @@
 use std::{
     ops::{Deref, DerefMut},
-    sync::{Arc, Mutex},
+    sync::{Arc, RwLock},
 };
 use tokio::sync::watch::{channel, Receiver};
 
 #[derive(Clone)]
 pub enum Variable<T> {
-    Static { value: T, rx: Receiver<T> },
-    Dynamic { lock_value: Arc<Mutex<T>>, value: T },
+    Static {
+        value: T,
+        rx: Receiver<T>,
+    },
+    Dynamic {
+        lock_value: Arc<RwLock<T>>,
+        value: T,
+    },
 }
 
 pub trait VariableSetter<T>: Fn(T) {}
 impl<T: Fn(U), U> VariableSetter<U> for T {}
 
-pub type VariableHandle<T> = Arc<Mutex<T>>;
+pub type VariableHandle<T> = Arc<RwLock<T>>;
 
 impl<T: 'static + Clone> Variable<T> {
     pub fn new_dynamic(value: T) -> (Self, VariableHandle<T>) {
-        let lock_value = Arc::new(Mutex::new(value.clone()));
+        let lock_value = Arc::new(RwLock::new(value.clone()));
         (
             Self::Dynamic {
                 value: value.clone(),
-                lock_value: Arc::new(Mutex::new(value)).clone(),
+                lock_value: Arc::new(RwLock::new(value)).clone(),
             },
             lock_value,
         )
@@ -64,7 +70,7 @@ impl<T: Clone> Variable<T> {
                 value
             }
             Self::Dynamic { value, lock_value } => {
-                if let Ok(lock_value) = lock_value.lock() {
+                if let Ok(lock_value) = lock_value.read() {
                     *value = lock_value.clone();
                 }
                 value
