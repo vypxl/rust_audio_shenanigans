@@ -1,13 +1,16 @@
 #![feature(array_chunks)]
 
 use cpal::{FromSample, Sample};
-use wave_generator::Wave;
+use wave::Wave;
 
+mod oscillator;
+pub mod partial_wave;
 mod variable;
-pub mod wave_generator;
+pub mod wave;
 pub mod waves;
 
-pub use crate::variable::Variable;
+pub use oscillator::Oscillator;
+pub use variable::Variable;
 
 type Generator = Box<dyn Wave + Send>;
 

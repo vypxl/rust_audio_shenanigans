@@ -1,53 +1,7 @@
-use std::ops::{Add, Deref, Mul};
+use std::ops::{Add, Div, Mul, Sub};
 
+use crate::wave::{Wave, WaveGenerator};
 use crate::waves::Constant;
-
-pub trait Wave {
-    fn next_sample(&mut self) -> f64;
-    fn sample_rate(&self) -> u32 {
-        44100
-    }
-}
-
-#[derive(Clone)]
-pub struct WaveGenerator<T>
-where
-    T: Wave,
-{
-    pub source: T,
-}
-
-impl<T: Wave> WaveGenerator<T> {
-    pub fn new(source: T) -> Self {
-        Self { source }
-    }
-}
-
-impl<T: Wave> Wave for WaveGenerator<T> {
-    fn next_sample(&mut self) -> f64 {
-        self.source.next_sample()
-    }
-}
-
-impl<T: Wave> From<T> for WaveGenerator<T> {
-    fn from(source: T) -> Self {
-        Self::new(source)
-    }
-}
-
-impl<T: Wave> Deref for WaveGenerator<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.source
-    }
-}
-
-impl<T: Wave> Iterator for WaveGenerator<T> {
-    type Item = f64;
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(self.source.next_sample())
-    }
-}
 
 #[derive(Clone)]
 pub struct IteratorWaveSource<T>
@@ -112,7 +66,9 @@ macro_rules! generator_op {
 }
 
 generator_op!(Add, add, |a, b| a + b);
+generator_op!(Sub, sub, |a, b| a - b);
 generator_op!(Mul, mul, |a, b| a * b);
+generator_op!(Div, div, |a, b| a / b);
 
 macro_rules! generator_op_const {
     ($trait_name:ident, $trait_fun:ident, $fun:expr) => {
@@ -137,4 +93,6 @@ macro_rules! generator_op_const {
 }
 
 generator_op_const!(Add, add, |a, b| a + b);
+generator_op_const!(Sub, sub, |a, b| a - b);
 generator_op_const!(Mul, mul, |a, b| a * b);
+generator_op_const!(Div, div, |a, b| a / b);
