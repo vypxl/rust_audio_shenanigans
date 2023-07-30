@@ -96,3 +96,9 @@ generator_op_const!(Add, add, |a, b| a + b);
 generator_op_const!(Sub, sub, |a, b| a - b);
 generator_op_const!(Mul, mul, |a, b| a * b);
 generator_op_const!(Div, div, |a, b| a / b);
+
+impl<T: Wave> Wave for Vec<T> {
+    fn next_sample(&mut self) -> f64 {
+        self.iter_mut().map(|w| w.next_sample()).sum()
+    }
+}

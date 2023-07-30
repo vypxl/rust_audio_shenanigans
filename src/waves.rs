@@ -11,7 +11,7 @@ mod adsr;
 mod constant;
 pub mod misc;
 
-pub use adsr::ADSR;
+pub use adsr::{ADSREvent, ADSR};
 pub use constant::{Constant, VariableConstant};
 
 pub fn constant<T: Into<f64>>(value: T) -> WaveGenerator<Constant> {

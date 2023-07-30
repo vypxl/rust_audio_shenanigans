@@ -24,6 +24,7 @@ impl Wave for Constant {
     }
 }
 
+#[derive(Clone)]
 pub struct VariableConstant {
     pub value: Variable<f64>,
 }
