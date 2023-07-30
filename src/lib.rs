@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use cpal::{FromSample, Sample};
 use wave::Wave;
 
+pub mod instrument;
 mod oscillator;
 pub mod partial_wave;
 mod variable;
@@ -18,32 +19,25 @@ type Generator = dyn Wave + Send;
 type GeneratorArc = Arc<Mutex<Box<Generator>>>;
 
 pub struct WaveStreamer {
-    wave_generator_l: GeneratorArc,
-    wave_generator_r: GeneratorArc,
+    wave_generator: GeneratorArc,
     sample_rate: Variable<u32>,
 }
 
 impl WaveStreamer {
-    pub fn new(
-        wave_generator_l: impl Wave + Send + 'static,
-        wave_generator_r: impl Wave + Send + 'static,
-        sample_rate: u32,
-    ) -> Self {
+    pub fn new(wave_generator: impl Wave + Send + 'static, sample_rate: u32) -> Self {
+        Self::new_raw(Arc::new(Mutex::new(Box::new(wave_generator))), sample_rate)
+    }
+
+    pub fn new_raw(wave_generator: GeneratorArc, sample_rate: u32) -> Self {
         Self {
-            wave_generator_l: Arc::new(Mutex::new(Box::new(wave_generator_l))),
-            wave_generator_r: Arc::new(Mutex::new(Box::new(wave_generator_r))),
+            wave_generator,
             sample_rate: Variable::new(sample_rate).0,
         }
     }
 
-    pub fn new_var(
-        wave_generator_l: impl Wave + Send + 'static,
-        wave_generator_r: impl Wave + Send + 'static,
-        sample_rate: Variable<u32>,
-    ) -> Self {
+    pub fn new_var(wave_generator: impl Wave + Send + 'static, sample_rate: Variable<u32>) -> Self {
         Self {
-            wave_generator_l: Arc::new(Mutex::new(Box::new(wave_generator_l))),
-            wave_generator_r: Arc::new(Mutex::new(Box::new(wave_generator_r))),
+            wave_generator: Arc::new(Mutex::new(Box::new(wave_generator))),
             sample_rate,
         }
     }
@@ -52,13 +46,12 @@ impl WaveStreamer {
     where
         T: Sample + FromSample<f64>,
     {
-        let mut gen_l = self.wave_generator_l.lock().unwrap();
-        let mut gen_r = self.wave_generator_r.lock().unwrap();
+        let mut gen = self.wave_generator.lock().unwrap();
         self.sample_rate.update();
 
         for [sample_l, sample_r] in buffer.array_chunks_mut() {
-            *sample_l = Sample::from_sample(gen_l.next_sample());
-            *sample_r = Sample::from_sample(gen_r.next_sample());
+            *sample_r = Sample::from_sample(gen.next_sample());
+            *sample_l = *sample_r;
         }
     }
 }

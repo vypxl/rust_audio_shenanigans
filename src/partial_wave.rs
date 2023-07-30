@@ -7,6 +7,7 @@ pub trait PartialWave<W: Wave> {
     fn build(self, src: W) -> WaveGenerator<Self::Target>;
 }
 
+#[derive(Clone)]
 pub struct PartialWaveBuilder<W: Wave, T: PartialWave<W>> {
     _w_marker: std::marker::PhantomData<W>,
     partial: T,

@@ -33,6 +33,7 @@ impl<T: Wave> Wave for Oscillator<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct PartialOscillator {
     wave_fn: WaveFn,
 }

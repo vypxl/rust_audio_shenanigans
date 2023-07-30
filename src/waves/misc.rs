@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::{Add, Div, Mul, Sub};
 
 use crate::wave::{Wave, WaveGenerator};
@@ -100,5 +101,11 @@ generator_op_const!(Div, div, |a, b| a / b);
 impl<T: Wave> Wave for Vec<T> {
     fn next_sample(&mut self) -> f64 {
         self.iter_mut().map(|w| w.next_sample()).sum()
+    }
+}
+
+impl<T: Wave, K> Wave for HashMap<K, T> {
+    fn next_sample(&mut self) -> f64 {
+        self.values_mut().map(|w| w.next_sample()).sum()
     }
 }

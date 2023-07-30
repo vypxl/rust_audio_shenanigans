@@ -2,7 +2,7 @@ use std::{error::Error, thread};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rust_audio_shenanigans::{wave::Wave, waves::*, *};
+use rust_audio_shenanigans::{instrument::*, waves::*, *};
 
 fn setup_device() -> Result<(cpal::Device, cpal::StreamConfig), Box<dyn Error>> {
     let host = cpal::default_host();
@@ -42,53 +42,27 @@ fn setup_stream(
     Ok(stream)
 }
 
-fn midi_note_number_to_frequency(note: midly::num::u7) -> f64 {
-    2.0f64.powf((note.as_int() as f64 - 69.0) / 12.0) * 440.0
-}
-
-fn instrument() -> (impl Wave + Clone, impl Fn(ADSREvent), impl Fn(f64)) {
-    // let wave = (((constant(20) >> sine() >> triangle()) * 100 + 650) >> saw())
-    // * ((constant(80) >> sine()) + 0.5);
-    let (adsr, trigger) = ADSR::new(0.08, 0.08, 0.8, 0.1);
-    let (freq, set_freq) = var(440.0);
-    let wave = freq.clone() >> triangle();
-    let wave2 = ((freq.clone() * 2) >> triangle()) * 0.5;
-    let wave3 = ((freq.clone() * 3) >> triangle()) * 0.25;
-    let wave4 = ((freq.clone() * 4) >> triangle()) * 0.125;
-    let wave5 = ((freq.clone() * 5) >> triangle()) * 0.0625;
-    let wave6 = ((freq.clone() * 6) >> triangle()) * 0.03125;
-    let wave7 = ((freq.clone() * 7) >> triangle()) * 0.015625;
-    let wave8 = ((freq.clone() * 8) >> triangle()) * 0.0078125;
-    let wave = (wave + wave2 + wave3 + wave4 + wave5 + wave6 + wave7 + wave8) * 0.2 * adsr;
-
-    (wave, trigger, set_freq)
-}
-
-fn instrument_poly(n: usize) -> (impl Wave + Clone, impl Fn(usize, ADSREvent)) {
-    let (wave, trigger, set_freq) = instrument();
-    let mut waves = vec![wave];
-    let mut triggers = vec![trigger];
-    let mut set_freqs = vec![set_freq];
-
-    for _ in 1..n {
-        let (wave, trigger, set_freq) = instrument();
-        waves.push(wave);
-        triggers.push(trigger);
-        set_freqs.push(set_freq);
-    }
-
-    let trigger = move |key: usize, e: ADSREvent| {
-        println!("triggering {}", key);
-        set_freqs[key % n](midi_note_number_to_frequency((key as u8).into()));
-        triggers[key % n](e);
-    };
-
-    (waves, trigger)
-}
+// fn instrument() -> (impl Wave + Clone, impl Fn(ADSREvent), impl Fn(f64)) {
+//     // let wave = (((constant(20) >> sine() >> triangle()) * 100 + 650) >> saw())
+//     // * ((constant(80) >> sine()) + 0.5);
+//     let (adsr, trigger) = ADSR::new(0.08, 0.08, 0.8, 0.1);
+//     let (freq, set_freq) = var(440.0);
+//     let wave = freq.clone() >> triangle();
+//     let wave2 = ((freq.clone() * 2) >> triangle()) * 0.5;
+//     let wave3 = ((freq.clone() * 3) >> triangle()) * 0.25;
+//     let wave4 = ((freq.clone() * 4) >> triangle()) * 0.125;
+//     let wave5 = ((freq.clone() * 5) >> triangle()) * 0.0625;
+//     let wave6 = ((freq.clone() * 6) >> triangle()) * 0.03125;
+//     let wave7 = ((freq.clone() * 7) >> triangle()) * 0.015625;
+//     let wave8 = ((freq.clone() * 8) >> triangle()) * 0.0078125;
+//     let wave = (wave + wave2 + wave3 + wave4 + wave5 + wave6 + wave7 + wave8) * 0.2 * adsr;
+//
+//     (wave, trigger, set_freq)
+// }
 
 fn process_event(
     event: midly::TrackEvent,
-    trigger: &impl Fn(usize, ADSREvent),
+    trigger: &mut impl FnMut(usize, ADSREvent),
     mspt: &mut f32,
     tpb: u32,
 ) {
@@ -151,7 +125,7 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> WaveStreamer {
     // Sort all events by their timestamp.
     all_events.sort_by_key(|(timestamp, _)| *timestamp);
 
-    let (waves, trigger) = instrument_poly(31);
+    let (mut inst, wave) = PolyInstrument::new(triangle());
 
     // Process all events in order.
     thread::spawn(move || {
@@ -164,12 +138,14 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> WaveStreamer {
                 thread::sleep(std::time::Duration::from_micros((delta * mspt) as u64))
             }
             print!("{delta} ");
-            process_event(event, &trigger, &mut mspt, tpb);
+            process_event(event, &mut |key, e| inst.play(key, e), &mut mspt, tpb);
             last_timestamp = timestamp;
         }
     });
 
-    WaveStreamer::new(waves.clone(), waves, sample_rate)
+    let wave = wave * 0.2;
+
+    WaveStreamer::new(wave, sample_rate)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
