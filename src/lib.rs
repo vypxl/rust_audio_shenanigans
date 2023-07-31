@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use cpal::{FromSample, Sample};
 use wave::Wave;
 
+pub mod effects;
 pub mod instrument;
 mod oscillator;
 pub mod partial_wave;
