@@ -1,5 +1,5 @@
 use crate::{
-    partial_wave::PartialWave,
+    partial_wave::{PartialWave, PartialWaveBuilder},
     wave::{Wave, WaveGenerator},
 };
 
@@ -34,17 +34,22 @@ impl<T: Wave> Wave for Oscillator<T> {
 }
 
 #[derive(Clone)]
-pub struct PartialOscillator {
+pub struct PartialOscillator<W> {
+    _w_marker: std::marker::PhantomData<W>,
     wave_fn: WaveFn,
 }
 
-impl PartialOscillator {
-    pub fn new(wave_fn: WaveFn) -> Self {
-        Self { wave_fn }
+impl<W: Wave> PartialOscillator<W> {
+    pub fn new(wave_fn: WaveFn) -> PartialWaveBuilder<W, Self> {
+        Self {
+            _w_marker: std::marker::PhantomData,
+            wave_fn,
+        }
+        .into()
     }
 }
 
-impl<W: Wave> PartialWave<W> for PartialOscillator {
+impl<W: Wave> PartialWave<W> for PartialOscillator<W> {
     type Target = Oscillator<W>;
 
     fn build(self, src: W) -> WaveGenerator<Self::Target> {

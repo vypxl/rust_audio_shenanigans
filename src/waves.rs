@@ -30,19 +30,19 @@ pub fn var_dyn<T: Into<f64>>(value: T) -> (WaveGenerator<VariableConstant>, Vari
     VariableConstant::new_dynamic(value)
 }
 
-pub fn sine<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator> {
-    PartialOscillator::new(|phase| (phase * TAU).sin()).into()
+pub fn sine<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
+    PartialOscillator::new(|phase| (phase * TAU).sin())
 }
 
-pub fn square() -> PartialOscillator {
+pub fn square<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
     PartialOscillator::new(|phase| if phase < 0.5 { -1.0 } else { 1.0 })
 }
 
-pub fn saw() -> PartialOscillator {
+pub fn sawtooth<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
     PartialOscillator::new(|phase| phase)
 }
 
-pub fn triangle() -> PartialOscillator {
+pub fn triangle<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
     PartialOscillator::new(|phase| {
         if phase < 0.5 {
             phase * 4.0 - 1.0
