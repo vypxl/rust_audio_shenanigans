@@ -1,9 +1,17 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rust_audio_shenanigans::{effects::lowpass, instrument::*, wave::Wave, waves::*};
 
+pub fn sine_lowpass(c: &mut Criterion) {
+    let mut g = c.benchmark_group("sine_lowpass");
+    g.bench_function("sine_lowpass", |b| {
+        let mut wave = ((constant(50) >> sine()) * 0.1) >> lowpass(5000.0, 1.1);
+        b.iter(|| wave.next_sample());
+    });
+    g.finish();
+}
+
 pub fn mountain_king(c: &mut Criterion) {
     let mut g = c.benchmark_group("mountain_king");
-    g.sample_size(10);
     g.bench_function("mountain_king", |b| {
         let song = midly::Smf::parse(include_bytes!("../songs/grieg_mountain_king.mid")).unwrap();
         let mut song_player = get_song_player(44100, song);
@@ -12,7 +20,7 @@ pub fn mountain_king(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, mountain_king);
+criterion_group!(benches, mountain_king, sine_lowpass);
 criterion_main!(benches);
 
 fn process_event(
