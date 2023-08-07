@@ -74,6 +74,7 @@ fn process_event(
                     trigger(key.as_int() as usize, ADSREvent::Release);
                     return;
                 }
+                println!("triggering: {key}");
                 trigger(
                     key.as_int() as usize,
                     ADSREvent::Press(vel.as_int() as f64 / 127.0),
@@ -139,7 +140,6 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> WaveStreamer {
             if sleeptime > 0 {
                 thread::sleep(std::time::Duration::from_micros((delta * mspt) as u64))
             }
-            print!("{delta} ");
             process_event(event, &mut |key, e| inst.play(key, e), &mut mspt, tpb);
             last_timestamp = timestamp;
         }

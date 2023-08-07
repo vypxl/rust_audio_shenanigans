@@ -38,10 +38,8 @@ impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> PolyInstrume
     pub fn play(&mut self, key: usize, e: ADSREvent) {
         let mut keymap = self.keymap.lock().unwrap();
         if let Some((_, trigger)) = keymap.get(&key) {
-            println!("triggering {key}");
             trigger.trigger(e);
         } else {
-            println!("triggering {key}");
             let (wave, trigger) = self.make_instrument(key);
             trigger.trigger(e);
             keymap.insert(key, (wave, trigger));
