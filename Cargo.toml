@@ -7,3 +7,18 @@ edition = "2021"
 cpal = "0.15.2"
 midly = "0.5.3"
 tokio = { version = "1.29.1", features = ["rt-multi-thread", "macros", "sync"] }
+
+[[bin]]
+name = "rust_audio_shenanigans_bin"
+path = "src/main.rs"
+
+[[bench]]
+name = "bench"
+harness = false
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = [
+  "async_tokio",
+  "async",
+  "futures",
+] }

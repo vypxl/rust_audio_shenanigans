@@ -27,7 +27,9 @@ impl<T: Wave> Wave for Oscillator<T> {
     fn next_sample(&mut self) -> f64 {
         let increase = self.frequency.next_sample() / self.sample_rate() as f64;
         self.phase += increase;
-        self.phase %= 1.0;
+        if self.phase > 1.0 {
+            self.phase -= 1.0;
+        }
 
         (self.wave_fn)(self.phase)
     }

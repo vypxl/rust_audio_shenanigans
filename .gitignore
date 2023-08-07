@@ -1,2 +1,5 @@
 /target
 songs
+perf.data
+perf.data*
+flamegraph.svg
