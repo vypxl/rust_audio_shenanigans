@@ -1,5 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use rust_audio_shenanigans::{effects::lowpass, instrument::*, wave::Wave, waves::*};
+use rust_audio_shenanigans::{
+    effects::lowpass, instrument::*, partial_wave::PartialWaveBuilder, wave::Wave, waves::*,
+};
 
 pub fn sine_lowpass(c: &mut Criterion) {
     let mut g = c.benchmark_group("sine_lowpass");
@@ -77,7 +79,9 @@ fn get_song_player(sample_rate: u32, song: midly::Smf) -> impl FnMut() {
     // Sort all events by their timestamp.
     all_events.sort_by_key(|(timestamp, _)| *timestamp);
 
-    let (mut inst, wave) = PolyInstrument::new(triangle() >> lowpass(600.0, 1.0));
+    let (mut inst, wave) = PolyInstrument::new(Box::new(|| {
+        PartialWaveBuilder::new(triangle() >> lowpass(600.0, 1.0))
+    }));
     let mut wave = wave * 0.2;
     // let (mut inst, wave) = PolyInstrument::new(sawtooth());
     // let (mut inst, wave) = PolyInstrument::new(sine());

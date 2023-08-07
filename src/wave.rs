@@ -7,42 +7,43 @@ pub trait Wave {
     }
 }
 
-#[derive(Clone)]
-pub struct WaveGenerator<T>
-where
-    T: Wave,
-{
-    pub source: T,
-}
+// #[derive(Clone)]
+// pub struct WaveGenerator
+// {
+//     pub source: T,
+// }
+pub type WaveBox = Box<dyn Wave + Send>;
 
-impl<T: Wave> WaveGenerator<T> {
-    pub fn new(source: T) -> Self {
-        Self { source }
+pub struct WaveGenerator(pub WaveBox);
+
+impl WaveGenerator {
+    pub fn new<T: Wave + 'static + Send>(source: T) -> Self {
+        Self(Box::new(source))
     }
 }
 
-impl<T: Wave> Wave for WaveGenerator<T> {
+impl Wave for WaveGenerator {
     fn next_sample(&mut self) -> f64 {
-        self.source.next_sample()
+        self.0.next_sample()
     }
 }
 
-impl<T: Wave> From<T> for WaveGenerator<T> {
-    fn from(source: T) -> Self {
-        Self::new(source)
-    }
-}
+// impl<T: Wave> From<T> for WaveGenerator {
+//     fn from(source: T) -> Self {
+//         Self::new(source)
+//     }
+// }
 
-impl<T: Wave> Deref for WaveGenerator<T> {
-    type Target = T;
+impl Deref for WaveGenerator {
+    type Target = WaveBox;
     fn deref(&self) -> &Self::Target {
-        &self.source
+        &self.0
     }
 }
 
-impl<T: Wave> Iterator for WaveGenerator<T> {
+impl Iterator for WaveGenerator {
     type Item = f64;
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.source.next_sample())
+        Some(self.0.next_sample())
     }
 }

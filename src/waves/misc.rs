@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::wave::{Wave, WaveGenerator};
+use crate::wave::{Wave, WaveBox, WaveGenerator};
 use crate::waves::Constant;
 
 #[derive(Clone)]
@@ -18,28 +18,19 @@ impl<T: Iterator<Item = f64> + Clone> Wave for IteratorWaveSource<T> {
     }
 }
 
-impl<T: Iterator<Item = f64> + Clone> From<T> for WaveGenerator<IteratorWaveSource<T>> {
+impl<T: Iterator<Item = f64> + Clone + 'static + Send> From<T> for WaveGenerator {
     fn from(iter: T) -> Self {
         Self::new(IteratorWaveSource { iter })
     }
 }
 
-#[derive(Clone)]
-pub struct MixWaveSource<T, U>
-where
-    T: Wave,
-    U: Wave,
-{
+pub struct MixWaveSource {
     mix: fn(f64, f64) -> f64,
-    left: T,
-    right: U,
+    left: WaveBox,
+    right: WaveBox,
 }
 
-impl<T, U> Wave for MixWaveSource<T, U>
-where
-    T: Wave,
-    U: Wave,
-{
+impl Wave for MixWaveSource {
     fn next_sample(&mut self) -> f64 {
         (self.mix)(self.left.next_sample(), self.right.next_sample())
     }
@@ -47,20 +38,14 @@ where
 
 macro_rules! generator_op {
     ($trait_name:ident, $trait_fun:ident, $fun:expr) => {
-        impl<T, U> $trait_name<WaveGenerator<U>> for WaveGenerator<T>
-        where
-            T: Wave,
-            U: Wave,
-        {
-            type Output = WaveGenerator<MixWaveSource<T, U>>;
-            fn $trait_fun(self, other: WaveGenerator<U>) -> Self::Output {
-                WaveGenerator {
-                    source: MixWaveSource {
-                        mix: $fun,
-                        left: self.source,
-                        right: other.source,
-                    },
-                }
+        impl $trait_name<WaveGenerator> for WaveGenerator {
+            type Output = WaveGenerator;
+            fn $trait_fun(self, other: WaveGenerator) -> Self::Output {
+                WaveGenerator::new(MixWaveSource {
+                    mix: $fun,
+                    left: self.0,
+                    right: other.0,
+                })
             }
         }
     };
@@ -73,21 +58,19 @@ generator_op!(Div, div, |a, b| a / b);
 
 macro_rules! generator_op_const {
     ($trait_name:ident, $trait_fun:ident, $fun:expr) => {
-        impl<T, N> $trait_name<N> for WaveGenerator<T>
+        impl<N> $trait_name<N> for WaveGenerator
         where
-            T: Wave,
             N: Into<f64>,
         {
-            type Output = WaveGenerator<MixWaveSource<T, Constant>>;
+            type Output = WaveGenerator;
             fn $trait_fun(self, other: N) -> Self::Output {
-                MixWaveSource {
+                WaveGenerator::new(MixWaveSource {
                     mix: $fun,
-                    left: self.source,
-                    right: Constant {
+                    left: self.0,
+                    right: Box::new(Constant {
                         value: other.into(),
-                    },
-                }
-                .into()
+                    }),
+                })
             }
         }
     };

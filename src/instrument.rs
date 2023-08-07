@@ -4,33 +4,33 @@ use std::{
 };
 
 use crate::{
-    partial_wave::PartialWave,
+    partial_wave::PartialWaveBuilder,
     wave::{Wave, WaveGenerator},
-    waves::{constant, misc::MixWaveSource, ADSREvent, ADSRTrigger, Constant, ADSR},
+    waves::{constant, ADSREvent, ADSRTrigger, ADSR},
 };
 
 fn midi_note_number_to_frequency<T: Into<f64>>(note: T) -> f64 {
     2.0f64.powf((note.into() - 69.0) / 12.0) * 440.0
 }
 
-type InstrumentWave<T> = WaveGenerator<MixWaveSource<<T as PartialWave<Constant>>::Target, ADSR>>;
-type Keymap<T> = Arc<Mutex<HashMap<usize, (InstrumentWave<T>, ADSRTrigger)>>>;
+type InstrumentWave = WaveGenerator;
+type Keymap = Arc<Mutex<HashMap<usize, (InstrumentWave, ADSRTrigger)>>>;
 
-pub struct PolyInstrument<T: PartialWave<Constant> + Clone> {
-    source: T,
-    keymap: Keymap<T>,
+pub struct PolyInstrument {
+    source: Box<dyn Fn() -> PartialWaveBuilder + Send>,
+    keymap: Keymap,
 }
 
 #[derive(Clone)]
-pub struct PolyInstrumentWave<T: PartialWave<Constant> + Clone> {
-    keymap: Keymap<T>,
+pub struct PolyInstrumentWave {
+    keymap: Keymap,
 }
 
-impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> PolyInstrument<T> {
-    fn make_instrument(&self, note: usize) -> (InstrumentWave<T>, ADSRTrigger) {
-        let (adsr, trigger) = ADSR::new(0.02, 0.3, 0.5, 0.05);
+impl PolyInstrument {
+    fn make_instrument(&self, note: usize) -> (InstrumentWave, ADSRTrigger) {
+        let (adsr, trigger) = ADSR::make(0.02, 0.3, 0.5, 0.05);
         let freq = constant(midi_note_number_to_frequency(note as u8));
-        let wave = freq >> self.source.clone();
+        let wave = freq >> (self.source)();
         let wave = wave * adsr;
         (wave, trigger)
     }
@@ -50,19 +50,19 @@ impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> PolyInstrume
         }
     }
 
-    pub fn new(source: T) -> (Self, WaveGenerator<PolyInstrumentWave<T>>) {
+    pub fn new(source: Box<dyn Fn() -> PartialWaveBuilder + Send>) -> (Self, WaveGenerator) {
         let keymap = Arc::new(Mutex::new(HashMap::new()));
         (
             Self {
                 source,
                 keymap: keymap.clone(),
             },
-            PolyInstrumentWave { keymap }.into(),
+            WaveGenerator::new(PolyInstrumentWave { keymap }),
         )
     }
 }
 
-impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> Wave for PolyInstrument<T> {
+impl Wave for PolyInstrument {
     fn next_sample(&mut self) -> f64 {
         self.keymap
             .lock()
@@ -72,7 +72,7 @@ impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> Wave for Pol
     }
 }
 
-impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> Wave for PolyInstrumentWave<T> {
+impl Wave for PolyInstrumentWave {
     fn next_sample(&mut self) -> f64 {
         self.keymap
             .lock()

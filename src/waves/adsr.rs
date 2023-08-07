@@ -39,15 +39,10 @@ pub struct ADSR {
 }
 
 impl ADSR {
-    pub fn new(
-        attack: f64,
-        decay: f64,
-        sustain: f64,
-        release: f64,
-    ) -> (WaveGenerator<Self>, Trigger) {
+    pub fn make(attack: f64, decay: f64, sustain: f64, release: f64) -> (WaveGenerator, Trigger) {
         let (tx, rx) = channel(ADSREvent::Release);
         (
-            Self {
+            WaveGenerator::new(Self {
                 attack,
                 decay,
                 sustain,
@@ -56,8 +51,7 @@ impl ADSR {
                 level: 0.0,
                 hold: false,
                 event_queue: rx,
-            }
-            .into(),
+            }),
             Trigger::new(tx),
         )
     }

@@ -10,11 +10,10 @@ pub struct Constant {
 }
 
 impl Constant {
-    pub fn new<T: Into<f64>>(value: T) -> WaveGenerator<Self> {
-        Self {
+    pub fn make<T: Into<f64>>(value: T) -> WaveGenerator {
+        WaveGenerator::new(Self {
             value: value.into(),
-        }
-        .into()
+        })
     }
 }
 
@@ -30,14 +29,14 @@ pub struct VariableConstant {
 }
 
 impl VariableConstant {
-    pub fn new<T: Into<f64>>(value: T) -> (WaveGenerator<Self>, impl VariableSetter<f64>) {
+    pub fn make<T: Into<f64>>(value: T) -> (WaveGenerator, impl VariableSetter<f64>) {
         let (var, updater) = Variable::new(value.into());
-        (Self { value: var }.into(), updater)
+        (WaveGenerator::new(Self { value: var }), updater)
     }
 
-    pub fn new_dynamic<T: Into<f64>>(value: T) -> (WaveGenerator<Self>, VariableHandle<f64>) {
+    pub fn new_dynamic<T: Into<f64>>(value: T) -> (WaveGenerator, VariableHandle<f64>) {
         let (var, updater) = Variable::new_dynamic(value.into());
-        (Self { value: var }.into(), updater)
+        (WaveGenerator::new(Self { value: var }), updater)
     }
 }
 

@@ -2,7 +2,9 @@ use std::{error::Error, thread};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rust_audio_shenanigans::{effects::lowpass, instrument::*, waves::*, *};
+use rust_audio_shenanigans::{
+    effects::lowpass, instrument::*, partial_wave::PartialWaveBuilder, waves::*, *,
+};
 
 fn setup_device() -> Result<(cpal::Device, cpal::StreamConfig), Box<dyn Error>> {
     let host = cpal::default_host();
@@ -126,7 +128,9 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> WaveStreamer {
     // Sort all events by their timestamp.
     all_events.sort_by_key(|(timestamp, _)| *timestamp);
 
-    let (mut inst, wave) = PolyInstrument::new(triangle() >> lowpass(600.0, 1.0));
+    let (mut inst, wave) = PolyInstrument::new(Box::new(|| {
+        PartialWaveBuilder::new(triangle() >> lowpass(2000.0, 1.0))
+    }));
     // let (mut inst, wave) = PolyInstrument::new(sawtooth());
     // let (mut inst, wave) = PolyInstrument::new(sine());
 

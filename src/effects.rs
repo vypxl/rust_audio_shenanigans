@@ -2,11 +2,10 @@ use std::collections::VecDeque;
 
 use crate::{
     partial_wave::{PartialWave, PartialWaveBuilder},
-    wave::{Wave, WaveGenerator},
+    wave::{Wave, WaveBox, WaveGenerator},
 };
 
-#[derive(Clone)]
-pub struct Lowpass<T: Wave> {
+pub struct Lowpass {
     a1: f64,
     a2: f64,
     a3: f64,
@@ -14,11 +13,11 @@ pub struct Lowpass<T: Wave> {
     b2: f64,
     in_buffer: VecDeque<f64>,
     out_buffer: VecDeque<f64>,
-    input: T,
+    input: WaveBox,
 }
 
-impl<T: Wave> Lowpass<T> {
-    pub fn new(f: f64, r: f64, input: T) -> Self {
+impl Lowpass {
+    pub fn new(f: f64, r: f64, input: WaveBox) -> Self {
         let c = 1.0 / (std::f64::consts::PI * f / 44100.0);
 
         let a1 = 1.0 / (1.0 + r * c + c * c);
@@ -43,7 +42,7 @@ impl<T: Wave> Lowpass<T> {
     }
 }
 
-impl<T: Wave> Wave for Lowpass<T> {
+impl Wave for Lowpass {
     fn next_sample(&mut self) -> f64 {
         let in0 = self.input.next_sample();
         let in1 = *self.in_buffer.get(0).unwrap_or(&0.0);
@@ -60,7 +59,6 @@ impl<T: Wave> Wave for Lowpass<T> {
     }
 }
 
-#[derive(Clone)]
 pub struct PartialLowpass {
     f: f64,
     r: f64,
@@ -72,14 +70,12 @@ impl PartialLowpass {
     }
 }
 
-impl<W: Wave> PartialWave<W> for PartialLowpass {
-    type Target = Lowpass<W>;
-
-    fn build(self, input: W) -> WaveGenerator<Self::Target> {
-        Lowpass::new(self.f, self.r, input).into()
+impl PartialWave for PartialLowpass {
+    fn build(&self, input: WaveBox) -> WaveGenerator {
+        WaveGenerator(Box::new(Lowpass::new(self.f, self.r, input)))
     }
 }
 
-pub fn lowpass<W: Wave>(f: f64, r: f64) -> PartialWaveBuilder<W, PartialLowpass> {
-    PartialLowpass::new(f, r).into()
+pub fn lowpass(f: f64, r: f64) -> PartialWaveBuilder {
+    PartialWaveBuilder::new(PartialLowpass::new(f, r))
 }

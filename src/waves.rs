@@ -4,7 +4,7 @@ use crate::{
     oscillator::PartialOscillator,
     partial_wave::PartialWaveBuilder,
     variable::{VariableHandle, VariableSetter},
-    wave::{Wave, WaveGenerator},
+    wave::WaveGenerator,
 };
 
 mod adsr;
@@ -14,36 +14,36 @@ pub mod misc;
 pub use adsr::{ADSREvent, Trigger as ADSRTrigger, ADSR};
 pub use constant::{Constant, VariableConstant};
 
-pub fn constant<T: Into<f64>>(value: T) -> WaveGenerator<Constant> {
-    Constant::new(value)
+pub fn constant<T: Into<f64>>(value: T) -> WaveGenerator {
+    Constant::make(value)
 }
 
-pub fn silence() -> WaveGenerator<Constant> {
+pub fn silence() -> WaveGenerator {
     constant(0.0)
 }
 
-pub fn var<T: Into<f64>>(value: T) -> (WaveGenerator<VariableConstant>, impl VariableSetter<f64>) {
-    VariableConstant::new(value)
+pub fn var<T: Into<f64>>(value: T) -> (WaveGenerator, impl VariableSetter<f64>) {
+    VariableConstant::make(value)
 }
 
-pub fn var_dyn<T: Into<f64>>(value: T) -> (WaveGenerator<VariableConstant>, VariableHandle<f64>) {
+pub fn var_dyn<T: Into<f64>>(value: T) -> (WaveGenerator, VariableHandle<f64>) {
     VariableConstant::new_dynamic(value)
 }
 
-pub fn sine<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
-    PartialOscillator::new(|phase| (phase * TAU).sin())
+pub fn sine() -> PartialWaveBuilder {
+    PartialOscillator::make(|phase| (phase * TAU).sin())
 }
 
-pub fn square<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
-    PartialOscillator::new(|phase| if phase < 0.5 { -1.0 } else { 1.0 })
+pub fn square() -> PartialWaveBuilder {
+    PartialOscillator::make(|phase| if phase < 0.5 { -1.0 } else { 1.0 })
 }
 
-pub fn sawtooth<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
-    PartialOscillator::new(|phase| phase)
+pub fn sawtooth() -> PartialWaveBuilder {
+    PartialOscillator::make(|phase| phase)
 }
 
-pub fn triangle<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
-    PartialOscillator::new(|phase| {
+pub fn triangle() -> PartialWaveBuilder {
+    PartialOscillator::make(|phase| {
         if phase < 0.5 {
             phase * 4.0 - 1.0
         } else {
