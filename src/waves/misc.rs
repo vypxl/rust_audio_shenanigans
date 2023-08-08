@@ -22,16 +22,16 @@ impl<T: Iterator<Item = f64> + Clone> From<T> for WaveGenerator<IteratorWaveSour
 }
 
 #[derive(Clone)]
-pub struct MixWaveSource<T, U> {
+pub struct MixWaveSource<W, V> {
     mix: fn(f64, f64) -> f64,
-    left: T,
-    right: U,
+    left: W,
+    right: V,
 }
 
-impl<T, U> Wave for MixWaveSource<T, U>
+impl<W, V> Wave for MixWaveSource<W, V>
 where
-    T: Wave,
-    U: Wave,
+    W: Wave,
+    V: Wave,
 {
     fn next_sample(&mut self) -> f64 {
         (self.mix)(self.left.next_sample(), self.right.next_sample())
@@ -40,13 +40,13 @@ where
 
 macro_rules! generator_op {
     ($trait_name:ident, $trait_fun:ident, $fun:expr) => {
-        impl<T, U> $trait_name<WaveGenerator<U>> for WaveGenerator<T>
+        impl<W, V> $trait_name<WaveGenerator<V>> for WaveGenerator<W>
         where
-            T: Wave,
-            U: Wave,
+            W: Wave,
+            V: Wave,
         {
-            type Output = WaveGenerator<MixWaveSource<T, U>>;
-            fn $trait_fun(self, other: WaveGenerator<U>) -> Self::Output {
+            type Output = WaveGenerator<MixWaveSource<W, V>>;
+            fn $trait_fun(self, other: WaveGenerator<V>) -> Self::Output {
                 WaveGenerator {
                     source: MixWaveSource {
                         mix: $fun,
@@ -66,12 +66,12 @@ generator_op!(Div, div, |a, b| a / b);
 
 macro_rules! generator_op_const {
     ($trait_name:ident, $trait_fun:ident, $fun:expr) => {
-        impl<T, N> $trait_name<N> for WaveGenerator<T>
+        impl<W, N> $trait_name<N> for WaveGenerator<W>
         where
-            T: Wave,
+            W: Wave,
             N: Into<f64>,
         {
-            type Output = WaveGenerator<MixWaveSource<T, Constant>>;
+            type Output = WaveGenerator<MixWaveSource<W, Constant>>;
             fn $trait_fun(self, other: N) -> Self::Output {
                 MixWaveSource {
                     mix: $fun,
@@ -91,13 +91,13 @@ generator_op_const!(Sub, sub, |a, b| a - b);
 generator_op_const!(Mul, mul, |a, b| a * b);
 generator_op_const!(Div, div, |a, b| a / b);
 
-impl<T: Wave> Wave for Vec<T> {
+impl<W: Wave> Wave for Vec<W> {
     fn next_sample(&mut self) -> f64 {
         self.iter_mut().map(|w| w.next_sample()).sum()
     }
 }
 
-impl<T: Wave, K> Wave for HashMap<K, T> {
+impl<W: Wave, K> Wave for HashMap<K, W> {
     fn next_sample(&mut self) -> f64 {
         self.values_mut().map(|w| w.next_sample()).sum()
     }

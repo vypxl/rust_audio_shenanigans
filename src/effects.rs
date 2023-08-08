@@ -43,7 +43,10 @@ impl<T> Lowpass<T> {
     }
 }
 
-impl<T: Wave> Wave for Lowpass<T> {
+impl<W> Wave for Lowpass<W>
+where
+    W: Wave,
+{
     fn next_sample(&mut self) -> f64 {
         let in0 = self.input.next_sample();
         let in1 = *self.in_buffer.get(0).unwrap_or(&0.0);
@@ -75,7 +78,10 @@ impl PartialLowpass {
 impl PartialWave for PartialLowpass {
     type Target<W: Wave> = Lowpass<W>;
 
-    fn build<W: Wave>(self, input: W) -> WaveGenerator<Self::Target<W>> {
+    fn build<W>(self, input: W) -> WaveGenerator<Self::Target<W>>
+    where
+        W: Wave,
+    {
         Lowpass::new(self.f, self.r, input).into()
     }
 }

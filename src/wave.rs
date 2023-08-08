@@ -18,7 +18,10 @@ impl<T> WaveGenerator<T> {
     }
 }
 
-impl<T: Wave> Wave for WaveGenerator<T> {
+impl<W> Wave for WaveGenerator<W>
+where
+    W: Wave,
+{
     fn next_sample(&mut self) -> f64 {
         self.source.next_sample()
     }
@@ -37,7 +40,10 @@ impl<T> Deref for WaveGenerator<T> {
     }
 }
 
-impl<T: Wave> Iterator for WaveGenerator<T> {
+impl<W> Iterator for WaveGenerator<W>
+where
+    W: Wave,
+{
     type Item = f64;
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.source.next_sample())

@@ -12,8 +12,11 @@ pub struct Oscillator<T> {
     frequency: T,
 }
 
-impl<T: Wave> Oscillator<T> {
-    pub fn new(wave_fn: fn(f64) -> f64, frequency: T) -> WaveGenerator<Self> {
+impl<W> Oscillator<W>
+where
+    W: Wave,
+{
+    pub fn new(wave_fn: fn(f64) -> f64, frequency: W) -> WaveGenerator<Self> {
         Self {
             wave_fn,
             phase: 0.0,
@@ -23,7 +26,10 @@ impl<T: Wave> Oscillator<T> {
     }
 }
 
-impl<T: Wave> Wave for Oscillator<T> {
+impl<W> Wave for Oscillator<W>
+where
+    W: Wave,
+{
     fn next_sample(&mut self) -> f64 {
         let increase = self.frequency.next_sample() / self.sample_rate() as f64;
         self.phase += increase;
@@ -49,7 +55,10 @@ impl PartialOscillator {
 impl PartialWave for PartialOscillator {
     type Target<W: Wave> = Oscillator<W>;
 
-    fn build<W: Wave>(self, src: W) -> WaveGenerator<Self::Target<W>> {
+    fn build<W>(self, src: W) -> WaveGenerator<Self::Target<W>>
+    where
+        W: Wave,
+    {
         Oscillator::new(self.wave_fn, src)
     }
 }

@@ -13,20 +13,30 @@ fn midi_note_number_to_frequency<T: Into<f64>>(note: T) -> f64 {
     2.0f64.powf((note.into() - 69.0) / 12.0) * 440.0
 }
 
-type InstrumentWave<T: Wave> = impl Wave;
+type InstrumentWave<W: Wave> = impl Wave;
 type Keymap<T> = Arc<Mutex<HashMap<usize, (InstrumentWave<T>, ADSRTrigger)>>>;
 
-pub struct PolyInstrument<T: PartialWave> {
+pub struct PolyInstrument<T>
+where
+    T: PartialWave,
+{
     source: T,
     keymap: Keymap<T::Target<Constant>>,
 }
 
 #[derive(Clone)]
-pub struct PolyInstrumentWave<T: PartialWave> {
+pub struct PolyInstrumentWave<T>
+where
+    T: PartialWave,
+{
     keymap: Keymap<T::Target<Constant>>,
 }
 
-impl<W: Wave, T: PartialWave<Target<Constant> = W> + Clone> PolyInstrument<T> {
+impl<W, T> PolyInstrument<T>
+where
+    W: Wave,
+    T: PartialWave<Target<Constant> = W> + Clone,
+{
     fn make_instrument(&self, note: usize) -> (InstrumentWave<W>, ADSRTrigger) {
         let (adsr, trigger) = ADSR::new(0.02, 0.3, 0.5, 0.05);
         let freq = constant(midi_note_number_to_frequency(note as u8));
@@ -63,7 +73,10 @@ impl<W: Wave, T: PartialWave<Target<Constant> = W> + Clone> PolyInstrument<T> {
     }
 }
 
-impl<T: PartialWave + Clone> Wave for PolyInstrument<T> {
+impl<T> Wave for PolyInstrument<T>
+where
+    T: PartialWave + Clone,
+{
     fn next_sample(&mut self) -> f64 {
         self.keymap
             .lock()
@@ -73,7 +86,10 @@ impl<T: PartialWave + Clone> Wave for PolyInstrument<T> {
     }
 }
 
-impl<T: PartialWave + Clone> Wave for PolyInstrumentWave<T> {
+impl<T> Wave for PolyInstrumentWave<T>
+where
+    T: PartialWave + Clone,
+{
     fn next_sample(&mut self) -> f64 {
         self.keymap
             .lock()

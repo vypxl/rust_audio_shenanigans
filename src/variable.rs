@@ -21,7 +21,10 @@ impl<T: Fn(U), U> VariableSetter<U> for T {}
 
 pub type VariableHandle<T> = Arc<RwLock<T>>;
 
-impl<T: 'static + Clone> Variable<T> {
+impl<T> Variable<T>
+where
+    T: 'static + Clone,
+{
     pub fn new_dynamic(value: T) -> (Self, VariableHandle<T>) {
         let lock_value = Arc::new(RwLock::new(value.clone()));
         (
@@ -34,7 +37,10 @@ impl<T: 'static + Clone> Variable<T> {
     }
 }
 
-impl<T: Clone> Variable<T> {
+impl<T> Variable<T>
+where
+    T: Clone,
+{
     pub fn new(value: T) -> (Self, impl VariableSetter<T>) {
         let (tx, rx) = channel(value.clone());
         (Self::Static { value, rx }, move |t: T| {
@@ -84,7 +90,10 @@ impl<T: Clone> Variable<T> {
     }
 }
 
-impl<T: Clone> From<T> for Variable<T> {
+impl<T> From<T> for Variable<T>
+where
+    T: Clone,
+{
     fn from(value: T) -> Self {
         Self::new(value).0
     }
