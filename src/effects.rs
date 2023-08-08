@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct Lowpass<T: Wave> {
+pub struct Lowpass<T> {
     a1: f64,
     a2: f64,
     a3: f64,
@@ -17,7 +17,7 @@ pub struct Lowpass<T: Wave> {
     input: T,
 }
 
-impl<T: Wave> Lowpass<T> {
+impl<T> Lowpass<T> {
     pub fn new(f: f64, r: f64, input: T) -> Self {
         let c = 1.0 / (std::f64::consts::PI * f / 44100.0);
 
@@ -72,14 +72,14 @@ impl PartialLowpass {
     }
 }
 
-impl<W: Wave> PartialWave<W> for PartialLowpass {
-    type Target = Lowpass<W>;
+impl PartialWave for PartialLowpass {
+    type Target<W: Wave> = Lowpass<W>;
 
-    fn build(self, input: W) -> WaveGenerator<Self::Target> {
+    fn build<W: Wave>(self, input: W) -> WaveGenerator<Self::Target<W>> {
         Lowpass::new(self.f, self.r, input).into()
     }
 }
 
-pub fn lowpass<W: Wave>(f: f64, r: f64) -> PartialWaveBuilder<W, PartialLowpass> {
+pub fn lowpass(f: f64, r: f64) -> PartialWaveBuilder<PartialLowpass> {
     PartialLowpass::new(f, r).into()
 }

@@ -126,7 +126,9 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> WaveStreamer {
     // Sort all events by their timestamp.
     all_events.sort_by_key(|(timestamp, _)| *timestamp);
 
-    let (mut inst, wave) = PolyInstrument::new(triangle() >> lowpass(600.0, 1.0));
+    let p = sawtooth() >> lowpass(3000.0, 1.0);
+    let (mut inst, wave) = PolyInstrument::new(p);
+    let wave = wave * 0.8;
     // let (mut inst, wave) = PolyInstrument::new(sawtooth());
     // let (mut inst, wave) = PolyInstrument::new(sine());
 

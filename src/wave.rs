@@ -8,14 +8,11 @@ pub trait Wave {
 }
 
 #[derive(Clone)]
-pub struct WaveGenerator<T>
-where
-    T: Wave,
-{
+pub struct WaveGenerator<T> {
     pub source: T,
 }
 
-impl<T: Wave> WaveGenerator<T> {
+impl<T> WaveGenerator<T> {
     pub fn new(source: T) -> Self {
         Self { source }
     }
@@ -27,13 +24,13 @@ impl<T: Wave> Wave for WaveGenerator<T> {
     }
 }
 
-impl<T: Wave> From<T> for WaveGenerator<T> {
+impl<T> From<T> for WaveGenerator<T> {
     fn from(source: T) -> Self {
         Self::new(source)
     }
 }
 
-impl<T: Wave> Deref for WaveGenerator<T> {
+impl<T> Deref for WaveGenerator<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.source

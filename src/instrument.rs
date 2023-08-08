@@ -6,28 +6,28 @@ use std::{
 use crate::{
     partial_wave::PartialWave,
     wave::{Wave, WaveGenerator},
-    waves::{constant, misc::MixWaveSource, ADSREvent, ADSRTrigger, Constant, ADSR},
+    waves::{constant, ADSREvent, ADSRTrigger, Constant, ADSR},
 };
 
 fn midi_note_number_to_frequency<T: Into<f64>>(note: T) -> f64 {
     2.0f64.powf((note.into() - 69.0) / 12.0) * 440.0
 }
 
-type InstrumentWave<T> = WaveGenerator<MixWaveSource<<T as PartialWave<Constant>>::Target, ADSR>>;
+type InstrumentWave<T: Wave> = impl Wave;
 type Keymap<T> = Arc<Mutex<HashMap<usize, (InstrumentWave<T>, ADSRTrigger)>>>;
 
-pub struct PolyInstrument<T: PartialWave<Constant> + Clone> {
+pub struct PolyInstrument<T: PartialWave> {
     source: T,
-    keymap: Keymap<T>,
+    keymap: Keymap<T::Target<Constant>>,
 }
 
 #[derive(Clone)]
-pub struct PolyInstrumentWave<T: PartialWave<Constant> + Clone> {
-    keymap: Keymap<T>,
+pub struct PolyInstrumentWave<T: PartialWave> {
+    keymap: Keymap<T::Target<Constant>>,
 }
 
-impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> PolyInstrument<T> {
-    fn make_instrument(&self, note: usize) -> (InstrumentWave<T>, ADSRTrigger) {
+impl<W: Wave, T: PartialWave<Target<Constant> = W> + Clone> PolyInstrument<T> {
+    fn make_instrument(&self, note: usize) -> (InstrumentWave<W>, ADSRTrigger) {
         let (adsr, trigger) = ADSR::new(0.02, 0.3, 0.5, 0.05);
         let freq = constant(midi_note_number_to_frequency(note as u8));
         let wave = freq >> self.source.clone();
@@ -40,9 +40,10 @@ impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> PolyInstrume
         if let Some((_, trigger)) = keymap.get(&key) {
             trigger.trigger(e);
         } else {
-            let (wave, trigger) = self.make_instrument(key);
-            trigger.trigger(e);
-            keymap.insert(key, (wave, trigger));
+            // let (wave, trigger) = self.make_instrument(key);
+            let inst = self.make_instrument(key);
+            inst.1.trigger(e);
+            keymap.insert(key, inst);
         }
         if e == ADSREvent::Release {
             // keymap.remove(&key);
@@ -62,7 +63,7 @@ impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> PolyInstrume
     }
 }
 
-impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> Wave for PolyInstrument<T> {
+impl<T: PartialWave + Clone> Wave for PolyInstrument<T> {
     fn next_sample(&mut self) -> f64 {
         self.keymap
             .lock()
@@ -72,7 +73,7 @@ impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> Wave for Pol
     }
 }
 
-impl<U: Wave + Clone, T: PartialWave<Constant, Target = U> + Clone> Wave for PolyInstrumentWave<T> {
+impl<T: PartialWave + Clone> Wave for PolyInstrumentWave<T> {
     fn next_sample(&mut self) -> f64 {
         self.keymap
             .lock()

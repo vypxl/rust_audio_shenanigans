@@ -6,7 +6,7 @@ use crate::{
 type WaveFn = fn(f64) -> f64;
 
 #[derive(Clone)]
-pub struct Oscillator<T: Wave> {
+pub struct Oscillator<T> {
     wave_fn: WaveFn,
     phase: f64,
     frequency: T,
@@ -36,25 +36,20 @@ impl<T: Wave> Wave for Oscillator<T> {
 }
 
 #[derive(Clone)]
-pub struct PartialOscillator<W> {
-    _w_marker: std::marker::PhantomData<W>,
+pub struct PartialOscillator {
     wave_fn: WaveFn,
 }
 
-impl<W: Wave> PartialOscillator<W> {
-    pub fn new(wave_fn: WaveFn) -> PartialWaveBuilder<W, Self> {
-        Self {
-            _w_marker: std::marker::PhantomData,
-            wave_fn,
-        }
-        .into()
+impl PartialOscillator {
+    pub fn new(wave_fn: WaveFn) -> PartialWaveBuilder<Self> {
+        Self { wave_fn }.into()
     }
 }
 
-impl<W: Wave> PartialWave<W> for PartialOscillator<W> {
-    type Target = Oscillator<W>;
+impl PartialWave for PartialOscillator {
+    type Target<W: Wave> = Oscillator<W>;
 
-    fn build(self, src: W) -> WaveGenerator<Self::Target> {
+    fn build<W: Wave>(self, src: W) -> WaveGenerator<Self::Target<W>> {
         Oscillator::new(self.wave_fn, src)
     }
 }

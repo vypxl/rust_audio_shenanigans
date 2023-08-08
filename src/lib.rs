@@ -1,4 +1,5 @@
 #![feature(array_chunks)]
+#![feature(type_alias_impl_trait)]
 
 use std::sync::{Arc, Mutex};
 

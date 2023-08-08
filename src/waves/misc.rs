@@ -5,10 +5,7 @@ use crate::wave::{Wave, WaveGenerator};
 use crate::waves::Constant;
 
 #[derive(Clone)]
-pub struct IteratorWaveSource<T>
-where
-    T: Iterator<Item = f64>,
-{
+pub struct IteratorWaveSource<T> {
     iter: T,
 }
 
@@ -25,11 +22,7 @@ impl<T: Iterator<Item = f64> + Clone> From<T> for WaveGenerator<IteratorWaveSour
 }
 
 #[derive(Clone)]
-pub struct MixWaveSource<T, U>
-where
-    T: Wave,
-    U: Wave,
-{
+pub struct MixWaveSource<T, U> {
     mix: fn(f64, f64) -> f64,
     left: T,
     right: U,

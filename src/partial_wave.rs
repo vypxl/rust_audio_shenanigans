@@ -2,61 +2,53 @@ use crate::wave::WaveGenerator;
 use crate::Wave;
 use std::ops::Shr;
 
-pub trait PartialWave<W: Wave> {
-    type Target: Wave;
-    fn build(self, src: W) -> WaveGenerator<Self::Target>;
+pub trait PartialWave {
+    type Target<T: Wave>: Wave;
+    fn build<T: Wave>(self, src: T) -> WaveGenerator<Self::Target<T>>;
 }
 
 #[derive(Clone)]
-pub struct PartialWaveBuilder<W: Wave, T: PartialWave<W>> {
-    _w_marker: std::marker::PhantomData<W>,
+pub struct PartialWaveBuilder<T> {
     partial: T,
 }
 
-impl<W: Wave, T: PartialWave<W>> From<T> for PartialWaveBuilder<W, T> {
+impl<T: PartialWave> From<T> for PartialWaveBuilder<T> {
     fn from(partial: T) -> Self {
-        Self {
-            _w_marker: std::marker::PhantomData,
-            partial,
-        }
+        Self { partial }
     }
 }
 
-impl<W: Wave, T: PartialWave<W>> PartialWave<W> for PartialWaveBuilder<W, T> {
-    type Target = T::Target;
-    fn build(self, src: W) -> WaveGenerator<T::Target> {
+impl<T: PartialWave> PartialWave for PartialWaveBuilder<T> {
+    type Target<W: Wave> = T::Target<W>;
+    fn build<W: Wave>(self, src: W) -> WaveGenerator<T::Target<W>> {
         self.partial.build(src)
     }
 }
 
-impl<W: Wave, T: PartialWave<W>> Shr<T> for WaveGenerator<W> {
-    type Output = WaveGenerator<T::Target>;
+impl<W: Wave, T: PartialWave> Shr<T> for WaveGenerator<W> {
+    type Output = WaveGenerator<T::Target<W>>;
     fn shr(self, dest: T) -> Self::Output {
         dest.build(self.source)
     }
 }
 
 #[derive(Clone)]
-pub struct PartialWaveChain<W: Wave, T: PartialWave<W>, S: PartialWave<T::Target>> {
-    _w_marker: std::marker::PhantomData<W>,
+pub struct PartialWaveChain<T, S> {
     src: T,
     dst: S,
 }
 
-impl<W: Wave, T: PartialWave<W>, S: PartialWave<T::Target>> PartialWave<W>
-    for PartialWaveChain<W, T, S>
-{
-    type Target = S::Target;
-    fn build(self, src: W) -> WaveGenerator<Self::Target> {
+impl<T: PartialWave, S: PartialWave> PartialWave for PartialWaveChain<T, S> {
+    type Target<W: Wave> = S::Target<T::Target<W>>;
+    fn build<W: Wave>(self, src: W) -> WaveGenerator<Self::Target<W>> {
         self.dst.build(self.src.build(src).source)
     }
 }
 
-impl<W: Wave, T: PartialWave<W>, S: PartialWave<T::Target>> Shr<S> for PartialWaveBuilder<W, T> {
-    type Output = PartialWaveChain<W, T, S>;
+impl<T: PartialWave, S: PartialWave> Shr<S> for PartialWaveBuilder<T> {
+    type Output = PartialWaveChain<T, S>;
     fn shr(self, dest: S) -> Self::Output {
         PartialWaveChain {
-            _w_marker: std::marker::PhantomData,
             src: self.partial,
             dst: dest,
         }

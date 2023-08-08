@@ -4,7 +4,7 @@ use crate::{
     oscillator::PartialOscillator,
     partial_wave::PartialWaveBuilder,
     variable::{VariableHandle, VariableSetter},
-    wave::{Wave, WaveGenerator},
+    wave::WaveGenerator,
 };
 
 mod adsr;
@@ -30,19 +30,19 @@ pub fn var_dyn<T: Into<f64>>(value: T) -> (WaveGenerator<VariableConstant>, Vari
     VariableConstant::new_dynamic(value)
 }
 
-pub fn sine<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
+pub fn sine() -> PartialWaveBuilder<PartialOscillator> {
     PartialOscillator::new(|phase| (phase * TAU).sin())
 }
 
-pub fn square<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
+pub fn square() -> PartialWaveBuilder<PartialOscillator> {
     PartialOscillator::new(|phase| if phase < 0.5 { -1.0 } else { 1.0 })
 }
 
-pub fn sawtooth<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
+pub fn sawtooth() -> PartialWaveBuilder<PartialOscillator> {
     PartialOscillator::new(|phase| phase)
 }
 
-pub fn triangle<W: Wave>() -> PartialWaveBuilder<W, PartialOscillator<W>> {
+pub fn triangle() -> PartialWaveBuilder<PartialOscillator> {
     PartialOscillator::new(|phase| {
         if phase < 0.5 {
             phase * 4.0 - 1.0
