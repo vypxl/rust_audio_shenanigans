@@ -22,10 +22,26 @@ macro_rules! make_wave_fn {
     };
 }
 
-make_wave_fn!(Sine, phase => (phase * TAU).sin());
+make_wave_fn!(TrueSine, phase => (phase * TAU).sin());
 make_wave_fn!(Square, phase => if phase < 0.5 { -1.0 } else { 1.0 });
 make_wave_fn!(Sawtooth, phase => phase);
 make_wave_fn!(Triangle, phase => if phase < 0.5 { phase * 4.0 - 1.0 } else { 3.0 - phase * 4.0 });
+
+/// Fast sine approximation, inspired by https://www.musicdsp.org/en/latest/Synthesis/13-sine-calculation.html
+#[derive(Clone)]
+pub struct Sine;
+
+impl WaveFn for Sine {
+    #[inline]
+    fn process(&mut self, phase: f64) -> f64 {
+        let x = (phase - 0.5) * TAU;
+        let x2 = x * x;
+
+        x * (x2
+            * (x2 * (x2 * (x2 * (1.0 / 362880.0) - (1.0 / 5040.0)) + (1.0 / 120.0)) - (1.0 / 6.0))
+            + 1.0)
+    }
+}
 
 #[derive(Clone)]
 pub struct Oscillator<T, F> {
