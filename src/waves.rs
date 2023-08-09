@@ -1,7 +1,5 @@
-use std::f64::consts::TAU;
-
 use crate::{
-    oscillator::PartialOscillator,
+    oscillator::{PartialOscillator, Sawtooth, Sine, Square, Triangle},
     partial_wave::PartialWaveBuilder,
     variable::{VariableHandle, VariableSetter},
     wave::WaveGenerator,
@@ -10,9 +8,11 @@ use crate::{
 mod adsr;
 mod constant;
 pub mod misc;
+mod mix;
 
 pub use adsr::{ADSREvent, Trigger as ADSRTrigger, ADSR};
 pub use constant::{Constant, VariableConstant};
+pub use mix::WaveMixer;
 
 pub fn constant<T>(value: T) -> WaveGenerator<Constant>
 where
@@ -39,24 +39,18 @@ where
     VariableConstant::new_dynamic(value)
 }
 
-pub fn sine() -> PartialWaveBuilder<PartialOscillator> {
-    PartialOscillator::new(|phase| (phase * TAU).sin())
+pub fn sine() -> PartialWaveBuilder<PartialOscillator<Sine>> {
+    PartialOscillator::new(Sine)
 }
 
-pub fn square() -> PartialWaveBuilder<PartialOscillator> {
-    PartialOscillator::new(|phase| if phase < 0.5 { -1.0 } else { 1.0 })
+pub fn square() -> PartialWaveBuilder<PartialOscillator<Square>> {
+    PartialOscillator::new(Square)
 }
 
-pub fn sawtooth() -> PartialWaveBuilder<PartialOscillator> {
-    PartialOscillator::new(|phase| phase)
+pub fn sawtooth() -> PartialWaveBuilder<PartialOscillator<Sawtooth>> {
+    PartialOscillator::new(Sawtooth)
 }
 
-pub fn triangle() -> PartialWaveBuilder<PartialOscillator> {
-    PartialOscillator::new(|phase| {
-        if phase < 0.5 {
-            phase * 4.0 - 1.0
-        } else {
-            3.0 - phase * 4.0
-        }
-    })
+pub fn triangle() -> PartialWaveBuilder<PartialOscillator<Triangle>> {
+    PartialOscillator::new(Triangle)
 }
