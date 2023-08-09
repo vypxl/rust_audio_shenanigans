@@ -1,4 +1,7 @@
-use std::{error::Error, thread};
+use std::{
+    error::Error,
+    thread::{self, JoinHandle},
+};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -74,11 +77,8 @@ fn process_event(
                     trigger(key.as_int() as usize, ADSREvent::Release);
                     return;
                 }
-                println!("triggering: {key}");
-                trigger(
-                    key.as_int() as usize,
-                    ADSREvent::Press(vel.as_int() as f64 / 127.0),
-                );
+                println!("triggering: {key} {vel}");
+                trigger(key.as_int() as usize, ADSREvent::Press(vel.as_int()));
             }
             midly::MidiMessage::NoteOff { key, .. } => {
                 // todo
@@ -107,7 +107,7 @@ fn process_event(
     }
 }
 
-fn setup_streamer(sample_rate: u32, song: midly::Smf) -> WaveStreamer {
+fn setup_streamer(sample_rate: u32, song: midly::Smf) -> (WaveStreamer, JoinHandle<()>) {
     let tpb = match song.header.timing {
         midly::Timing::Metrical(x) => x.as_int() as u32,
         midly::Timing::Timecode(_, _) => todo!(),
@@ -126,14 +126,14 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> WaveStreamer {
     // Sort all events by their timestamp.
     all_events.sort_by_key(|(timestamp, _)| *timestamp);
 
-    let p = sawtooth() >> lowpass(3000.0, 1.0);
+    let p = triangle() >> lowpass(600.0, 1.0);
     let (mut inst, wave) = PolyInstrument::new(p);
-    let wave = wave * 0.8;
+    let wave = wave * 0.3;
     // let (mut inst, wave) = PolyInstrument::new(sawtooth());
     // let (mut inst, wave) = PolyInstrument::new(sine());
 
     // Process all events in order.
-    thread::spawn(move || {
+    let handle = thread::spawn(move || {
         let mut last_timestamp = 0;
         let mut mspt = 0.0;
         for (timestamp, event) in all_events {
@@ -149,7 +149,7 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> WaveStreamer {
 
     let wave = wave * 0.2;
 
-    WaveStreamer::new(wave, sample_rate)
+    (WaveStreamer::new(wave, sample_rate), handle)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -158,12 +158,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fname = std::env::args().nth(1).unwrap();
     let data = std::fs::read(fname)?;
     let smf = midly::Smf::parse(&data)?;
-    let streamer = setup_streamer(config.sample_rate.0, smf);
+    let (streamer, handle) = setup_streamer(config.sample_rate.0, smf);
 
     let stream = setup_stream(&device, &config, streamer)?;
     stream.play()?;
 
-    std::thread::park();
-
+    handle.join().unwrap();
+    // To not cut off the last notes
+    std::thread::sleep(std::time::Duration::from_secs(1));
     Ok(())
 }

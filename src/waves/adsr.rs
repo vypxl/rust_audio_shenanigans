@@ -1,27 +1,36 @@
-use tokio::sync::watch::{channel, Receiver, Sender};
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
+};
 
 use crate::wave::{Wave, WaveGenerator};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ADSREvent {
-    Press(f64),
+    /// Velocity is a value between 0 and 127
+    Press(u8),
     Release,
 }
 
+const NEW_MSG: u32 = 0x80;
+const VEL_MASK: u32 = 0x7F;
+
 pub struct Trigger {
-    tx: Sender<ADSREvent>,
+    _trigger: Arc<AtomicU32>,
 }
 
 impl Trigger {
-    pub fn new(tx: Sender<ADSREvent>) -> Self {
-        Self { tx }
+    pub fn new(trigger: Arc<AtomicU32>) -> Self {
+        Self { _trigger: trigger }
     }
 
     pub fn trigger(&self, e: ADSREvent) {
-        // Ignoring this error, because it's not important. The send only fails, if the
-        // receiver is dropped, and that only happens, if the audio thread dies. This is easily
-        // detectable.
-        let _ = self.tx.send(e);
+        let msg = NEW_MSG
+            | match e {
+                ADSREvent::Press(vel) => vel as u32,
+                ADSREvent::Release => 0,
+            };
+        self._trigger.store(msg, Ordering::Relaxed);
     }
 }
 
@@ -35,7 +44,7 @@ pub struct ADSR {
     phase: f64,
     level: f64,
     hold: bool,
-    event_queue: Receiver<ADSREvent>,
+    trigger: Arc<AtomicU32>,
 }
 
 impl ADSR {
@@ -45,7 +54,7 @@ impl ADSR {
         sustain: f64,
         release: f64,
     ) -> (WaveGenerator<Self>, Trigger) {
-        let (tx, rx) = channel(ADSREvent::Release);
+        let trigger = Arc::new(AtomicU32::new(0));
         (
             Self {
                 attack,
@@ -55,10 +64,10 @@ impl ADSR {
                 phase: 1.0 + attack + decay + release,
                 level: 0.0,
                 hold: false,
-                event_queue: rx,
+                trigger: trigger.clone(),
             }
             .into(),
-            Trigger::new(tx),
+            Trigger::new(trigger),
         )
     }
 
@@ -77,31 +86,37 @@ impl ADSR {
     fn get_release_lvl(&self) -> f64 {
         self.sustain * (1.0 - (self.phase - (self.attack + self.decay)) / self.release)
     }
+
+    fn handle_msg(&mut self) {
+        let msg = self.trigger.swap(0, Ordering::Relaxed);
+        if msg == 0 {
+            return;
+        }
+
+        let vel = msg & VEL_MASK;
+
+        match vel {
+            0 => {
+                self.hold = false;
+            }
+            _ => {
+                self.phase = if self.phase >= self.attack + self.decay
+                    && self.phase < self.attack + self.decay + self.release
+                {
+                    self.get_release_lvl() * self.attack
+                } else {
+                    0.0
+                };
+                self.level = vel as f64 / 127.0;
+                self.hold = true;
+            }
+        }
+    }
 }
 
 impl Wave for ADSR {
     fn next_sample(&mut self) -> f64 {
-        if let Ok(has_changed) = self.event_queue.has_changed() {
-            if has_changed {
-                let m = *self.event_queue.borrow_and_update();
-                match m {
-                    ADSREvent::Press(vel) => {
-                        self.phase = if self.phase >= self.attack + self.decay
-                            && self.phase < self.attack + self.decay + self.release
-                        {
-                            self.get_release_lvl() * self.attack
-                        } else {
-                            0.0
-                        };
-                        self.level = vel;
-                        self.hold = true;
-                    }
-                    ADSREvent::Release => {
-                        self.hold = false;
-                    }
-                }
-            }
-        }
+        self.handle_msg();
 
         if self.phase >= self.attack + self.decay + self.release {
             return 0.0;

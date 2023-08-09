@@ -36,10 +36,7 @@ fn process_event(
                     trigger(key.as_int() as usize, ADSREvent::Release);
                     return;
                 }
-                trigger(
-                    key.as_int() as usize,
-                    ADSREvent::Press(vel.as_int() as f64 / 127.0),
-                );
+                trigger(key.as_int() as usize, ADSREvent::Press(vel.as_int()));
             }
             midly::MidiMessage::NoteOff { key, .. } => {
                 // todo
