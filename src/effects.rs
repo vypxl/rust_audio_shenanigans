@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use crate::{
     make_partial,
     partial_wave::{PartialWave, PartialWaveBuilder},
@@ -13,8 +11,9 @@ pub struct Lowpass<T> {
     a3: f64,
     b1: f64,
     b2: f64,
-    in_buffer: VecDeque<f64>,
-    out_buffer: VecDeque<f64>,
+    in_buffer: [f64; 2],
+    out_buffer: [f64; 2],
+    offset: usize,
     input: T,
 }
 
@@ -28,8 +27,8 @@ impl<T> Lowpass<T> {
         let b1 = 2.0 * (1.0 - c * c) * a1;
         let b2 = (1.0 - r * c + c * c) * a1;
 
-        let in_buffer = VecDeque::with_capacity(2);
-        let out_buffer = VecDeque::with_capacity(2);
+        let in_buffer = [0.0; 2];
+        let out_buffer = [0.0; 2];
 
         Self {
             a1,
@@ -39,6 +38,7 @@ impl<T> Lowpass<T> {
             b2,
             in_buffer,
             out_buffer,
+            offset: 0,
             input,
         }
         .into()
@@ -49,18 +49,25 @@ impl<W> Wave for Lowpass<W>
 where
     W: Wave,
 {
+    #[inline]
     fn next_sample(&mut self) -> f64 {
-        let in0 = self.input.next_sample();
-        let in1 = *self.in_buffer.get(0).unwrap_or(&0.0);
-        let in2 = self.in_buffer.pop_back().unwrap_or(0.0);
-        self.in_buffer.push_front(in0);
+        let i1 = self.offset;
+        let i2 = 1 - self.offset;
 
-        let out1 = *self.out_buffer.get(0).unwrap_or(&0.0);
-        let out2 = self.out_buffer.pop_back().unwrap_or(0.0);
+        let in0 = self.input.next_sample();
+        let in1 = self.in_buffer[i1];
+        let in2 = self.in_buffer[i2];
+        self.in_buffer[i2] = in0;
+
+        let out1 = self.out_buffer[i1];
+        let out2 = self.out_buffer[i2];
 
         let out = self.a1 * in0 + self.a2 * in1 + self.a3 * in2 - self.b1 * out1 - self.b2 * out2;
 
-        self.out_buffer.push_front(out);
+        self.out_buffer[i2] = out;
+
+        self.offset = i2;
+
         out * 4.0
     }
 }
