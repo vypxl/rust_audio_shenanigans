@@ -5,6 +5,7 @@
 /// using closures. Probably because thanks to the generic argument that I can pass this way, the
 /// compiler can inline the functions, which it doesn't do for closures in this case.
 use crate::{
+    partial_wave::{PartialWave, PartialWaveBuilder},
     wave::{Wave, WaveGenerator},
     waves::Constant,
 };
@@ -17,6 +18,7 @@ pub trait MixFn {
 /// Create a struct implementing MixFn by combining `left` and `right` with the given expression.
 macro_rules! make_mixer {
     ($name:ident, $left:ident $right:ident => $fun:expr) => {
+        #[derive(Clone)]
         pub struct $name;
         impl MixFn for $name {
             #[inline]
@@ -104,3 +106,164 @@ generator_op_const!(Add, add, MixAdd);
 generator_op_const!(Sub, sub, MixSub);
 generator_op_const!(Mul, mul, MixMul);
 generator_op_const!(Div, div, MixDiv);
+
+#[derive(Clone)]
+pub struct PartialWaveMixer1<M, W, T> {
+    mixer: M,
+    left: W,
+    right: T,
+}
+
+impl<M, W, T> PartialWaveMixer1<M, W, T>
+where
+    M: MixFn,
+    W: Wave,
+    T: PartialWave,
+{
+    pub fn new(mixer: M, left: W, right: T) -> Self {
+        Self { mixer, left, right }
+    }
+}
+
+impl<M, W, T> PartialWave for PartialWaveMixer1<M, W, T>
+where
+    M: MixFn + Clone + Send + Sync,
+    W: Wave + Clone + Send + Sync,
+    T: PartialWave,
+{
+    type Target<V: Wave + Clone + Send + Sync> = WaveMixer<M, W, WaveGenerator<T::Target<V>>>;
+    fn build<V>(self, src: V) -> WaveGenerator<Self::Target<V>>
+    where
+        V: Wave + Clone + Send + Sync,
+    {
+        WaveMixer {
+            mixer: self.mixer,
+            left: self.left,
+            right: self.right.build(src),
+        }
+        .into()
+    }
+}
+
+#[derive(Clone)]
+pub struct PartialWaveMixer2<M, T, U> {
+    mixer: M,
+    left: T,
+    right: U,
+}
+
+impl<M, T, U> PartialWaveMixer2<M, T, U>
+where
+    M: MixFn,
+    T: PartialWave,
+    U: PartialWave,
+{
+    pub fn new(mixer: M, left: T, right: U) -> Self {
+        Self { mixer, left, right }
+    }
+}
+
+impl<M, T, U> PartialWave for PartialWaveMixer2<M, T, U>
+where
+    M: MixFn + Clone + Send + Sync,
+    T: PartialWave,
+    U: PartialWave,
+{
+    type Target<V: Wave + Clone + Send + Sync> =
+        WaveMixer<M, WaveGenerator<T::Target<V>>, WaveGenerator<U::Target<V>>>;
+    fn build<V>(self, src: V) -> WaveGenerator<Self::Target<V>>
+    where
+        V: Wave + Clone + Send + Sync,
+    {
+        WaveMixer {
+            mixer: self.mixer,
+            left: self.left.build(src.clone()),
+            right: self.right.build(src),
+        }
+        .into()
+    }
+}
+
+macro_rules! partial_op {
+    ($trait_name:ident, $trait_fun:ident, $mixer:ident) => {
+        impl<W, T> $trait_name<WaveGenerator<W>> for PartialWaveBuilder<T>
+        where
+            T: PartialWave,
+            W: Wave + Clone + Send + Sync,
+        {
+            type Output = PartialWaveBuilder<PartialWaveMixer1<$mixer, WaveGenerator<W>, T>>;
+            fn $trait_fun(self, other: WaveGenerator<W>) -> Self::Output {
+                PartialWaveMixer1 {
+                    mixer: $mixer,
+                    left: other,
+                    right: self.into_inner(),
+                }
+                .into()
+            }
+        }
+
+        impl<W, T> $trait_name<PartialWaveBuilder<T>> for WaveGenerator<W>
+        where
+            T: PartialWave,
+            W: Wave + Clone + Send + Sync,
+        {
+            type Output = PartialWaveBuilder<PartialWaveMixer1<$mixer, WaveGenerator<W>, T>>;
+            fn $trait_fun(self, other: PartialWaveBuilder<T>) -> Self::Output {
+                PartialWaveMixer1 {
+                    mixer: $mixer,
+                    left: self,
+                    right: other.into_inner(),
+                }
+                .into()
+            }
+        }
+
+        impl<T, U> $trait_name<PartialWaveBuilder<U>> for PartialWaveBuilder<T>
+        where
+            T: PartialWave,
+            U: PartialWave,
+        {
+            type Output = PartialWaveBuilder<PartialWaveMixer2<$mixer, T, U>>;
+            fn $trait_fun(self, other: PartialWaveBuilder<U>) -> Self::Output {
+                PartialWaveMixer2 {
+                    mixer: $mixer,
+                    left: self.into_inner(),
+                    right: other.into_inner(),
+                }
+                .into()
+            }
+        }
+    };
+}
+
+partial_op!(Add, add, MixAdd);
+partial_op!(Sub, sub, MixSub);
+partial_op!(Mul, mul, MixMul);
+partial_op!(Div, div, MixDiv);
+
+macro_rules! partial_op_const {
+    ($trait_name:ident, $trait_fun:ident, $mixer:ident) => {
+        impl<T, N> $trait_name<N> for PartialWaveBuilder<T>
+        where
+            T: PartialWave,
+            N: Into<f64>,
+        {
+            type Output = PartialWaveBuilder<PartialWaveMixer1<$mixer, Constant, T>>;
+            fn $trait_fun(self, other: N) -> Self::Output {
+                PartialWaveMixer1 {
+                    mixer: $mixer,
+                    left: Constant {
+                        value: other.into(),
+                    },
+                    right: self.into_inner(),
+                }
+                .into()
+            }
+        }
+    };
+}
+
+partial_op_const!(Add, add, MixAdd);
+partial_op_const!(Sub, sub, MixSub);
+partial_op_const!(Mul, mul, MixMul);
+partial_op_const!(Div, div, MixDiv);

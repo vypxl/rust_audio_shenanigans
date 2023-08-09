@@ -89,7 +89,7 @@ pub struct PartialOscillator<F> {
 
 impl<F> PartialOscillator<F>
 where
-    F: WaveFn,
+    F: WaveFn + Clone + Send + Sync,
 {
     pub fn new(wave_fn: F) -> PartialWaveBuilder<Self> {
         Self { wave_fn }.into()
@@ -98,12 +98,12 @@ where
 
 impl<F> PartialWave for PartialOscillator<F>
 where
-    F: WaveFn,
+    F: WaveFn + Clone + Send + Sync,
 {
-    type Target<W: Wave> = Oscillator<W, F>;
+    type Target<W: Wave + Clone + Send + Sync> = Oscillator<W, F>;
     fn build<W>(self, input: W) -> WaveGenerator<Self::Target<W>>
     where
-        W: Wave,
+        W: Wave + Clone + Send + Sync,
     {
         Oscillator::new(self.wave_fn, input)
     }

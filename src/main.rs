@@ -5,7 +5,13 @@ use std::{
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rust_audio_shenanigans::{effects::lowpass, instrument::*, waves::*, *};
+use rust_audio_shenanigans::{
+    effects::lowpass,
+    instrument::*,
+    partial_wave::{PartialWave, PartialWaveBuilder},
+    waves::*,
+    *,
+};
 
 fn setup_device() -> Result<(cpal::Device, cpal::StreamConfig), Box<dyn Error>> {
     let host = cpal::default_host();
@@ -45,23 +51,18 @@ fn setup_stream(
     Ok(stream)
 }
 
-// fn instrument() -> (impl Wave + Clone, impl Fn(ADSREvent), impl Fn(f64)) {
-//     // let wave = (((constant(20) >> sine() >> triangle()) * 100 + 650) >> saw())
-//     // * ((constant(80) >> sine()) + 0.5);
-//     let (adsr, trigger) = ADSR::new(0.08, 0.08, 0.8, 0.1);
-//     let (freq, set_freq) = var(440.0);
-//     let wave = freq.clone() >> triangle();
-//     let wave2 = ((freq.clone() * 2) >> triangle()) * 0.5;
-//     let wave3 = ((freq.clone() * 3) >> triangle()) * 0.25;
-//     let wave4 = ((freq.clone() * 4) >> triangle()) * 0.125;
-//     let wave5 = ((freq.clone() * 5) >> triangle()) * 0.0625;
-//     let wave6 = ((freq.clone() * 6) >> triangle()) * 0.03125;
-//     let wave7 = ((freq.clone() * 7) >> triangle()) * 0.015625;
-//     let wave8 = ((freq.clone() * 8) >> triangle()) * 0.0078125;
-//     let wave = (wave + wave2 + wave3 + wave4 + wave5 + wave6 + wave7 + wave8) * 0.2 * adsr;
-//
-//     (wave, trigger, set_freq)
-// }
+fn instrument() -> PartialWaveBuilder<impl PartialWave + Clone> {
+    let wave = triangle();
+    let wave2 = ((pass() * 2) >> square()) * 0.5;
+    let wave3 = ((pass() * 3) >> square()) * 0.25;
+    let wave4 = ((pass() * 4) >> square()) * 0.125;
+    let wave5 = ((pass() * 5) >> square()) * 0.0625;
+    let wave6 = ((pass() * 6) >> square()) * 0.03125;
+    let wave7 = ((pass() * 7) >> square()) * 0.015625;
+    let wave8 = ((pass() * 8) >> square()) * 0.0078125;
+
+    ((wave + wave2 + wave3 + wave4 + wave5 + wave6 + wave7 + wave8) * 0.2) >> lowpass(5000.0, 1.0)
+}
 
 fn process_event(
     event: midly::TrackEvent,
@@ -126,11 +127,9 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> (WaveStreamer, JoinHand
     // Sort all events by their timestamp.
     all_events.sort_by_key(|(timestamp, _)| *timestamp);
 
-    let p = triangle() >> lowpass(600.0, 1.0);
+    let p = instrument();
     let (mut inst, wave) = PolyInstrument::new(p);
-    let wave = wave * 0.3;
-    // let (mut inst, wave) = PolyInstrument::new(sawtooth());
-    // let (mut inst, wave) = PolyInstrument::new(sine());
+    let wave = wave * 0.1;
 
     // Process all events in order.
     let handle = thread::spawn(move || {
@@ -146,8 +145,6 @@ fn setup_streamer(sample_rate: u32, song: midly::Smf) -> (WaveStreamer, JoinHand
             last_timestamp = timestamp;
         }
     });
-
-    let wave = wave * 0.2;
 
     (WaveStreamer::new(wave, sample_rate), handle)
 }

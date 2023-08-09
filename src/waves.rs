@@ -14,6 +14,8 @@ pub use adsr::{ADSREvent, Trigger as ADSRTrigger, ADSR};
 pub use constant::{Constant, VariableConstant};
 pub use mix::WaveMixer;
 
+use self::misc::PartialPass;
+
 pub fn constant<T>(value: T) -> WaveGenerator<Constant>
 where
     T: Into<f64>,
@@ -53,4 +55,8 @@ pub fn sawtooth() -> PartialWaveBuilder<PartialOscillator<Sawtooth>> {
 
 pub fn triangle() -> PartialWaveBuilder<PartialOscillator<Triangle>> {
     PartialOscillator::new(Triangle)
+}
+
+pub fn pass() -> PartialWaveBuilder<PartialPass> {
+    PartialPass::new()
 }

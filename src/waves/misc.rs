@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::wave::{Wave, WaveGenerator};
+use crate::{
+    make_partial,
+    partial_wave::{PartialWave, PartialWaveBuilder},
+    wave::{Wave, WaveGenerator},
+};
 
 #[derive(Clone)]
 pub struct IteratorWaveSource<T> {
@@ -30,3 +34,23 @@ impl<W: Wave, K> Wave for HashMap<K, W> {
         self.values_mut().map(|w| w.next_sample()).sum()
     }
 }
+
+#[derive(Clone)]
+pub struct Pass<W> {
+    input: W,
+}
+
+impl<W> Pass<W> {
+    pub fn new(input: W) -> WaveGenerator<Self> {
+        Self { input }.into()
+    }
+}
+
+impl<W: Wave> Wave for Pass<W> {
+    #[inline]
+    fn next_sample(&mut self) -> f64 {
+        self.input.next_sample()
+    }
+}
+
+make_partial!(PartialPass {} => Pass);

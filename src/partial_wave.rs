@@ -3,16 +3,26 @@ use crate::Wave;
 use std::ops::Shr;
 
 pub trait PartialWave {
-    type Target<W: Wave>: Wave;
+    type Target<W: Wave + Clone + Send + Sync>: Wave + Clone + Send + Sync;
 
     fn build<W>(self, src: W) -> WaveGenerator<Self::Target<W>>
     where
-        W: Wave;
+        W: Wave + Clone + Send + Sync;
 }
 
 #[derive(Clone)]
 pub struct PartialWaveBuilder<T> {
     partial: T,
+}
+
+impl<T> PartialWaveBuilder<T> {
+    pub fn new(partial: T) -> Self {
+        Self { partial }
+    }
+
+    pub fn into_inner(self) -> T {
+        self.partial
+    }
 }
 
 impl<T> From<T> for PartialWaveBuilder<T>
@@ -28,11 +38,11 @@ impl<T> PartialWave for PartialWaveBuilder<T>
 where
     T: PartialWave,
 {
-    type Target<W: Wave> = T::Target<W>;
+    type Target<W: Wave + Clone + Send + Sync> = T::Target<W>;
 
     fn build<W>(self, src: W) -> WaveGenerator<T::Target<W>>
     where
-        W: Wave,
+        W: Wave + Clone + Send + Sync,
     {
         self.partial.build(src)
     }
@@ -40,7 +50,7 @@ where
 
 impl<W, T> Shr<T> for WaveGenerator<W>
 where
-    W: Wave,
+    W: Wave + Clone + Send + Sync,
     T: PartialWave,
 {
     type Output = WaveGenerator<T::Target<W>>;
@@ -60,10 +70,10 @@ where
     T: PartialWave,
     S: PartialWave,
 {
-    type Target<W: Wave> = S::Target<T::Target<W>>;
+    type Target<W: Wave + Clone + Send + Sync> = S::Target<T::Target<W>>;
     fn build<W>(self, src: W) -> WaveGenerator<Self::Target<W>>
     where
-        W: Wave,
+        W: Wave + Clone + Send + Sync,
     {
         self.dst.build(self.src.build(src).source)
     }
@@ -74,12 +84,13 @@ where
     T: PartialWave,
     S: PartialWave,
 {
-    type Output = PartialWaveChain<T, S>;
+    type Output = PartialWaveBuilder<PartialWaveChain<T, S>>;
     fn shr(self, dest: S) -> Self::Output {
         PartialWaveChain {
             src: self.partial,
             dst: dest,
         }
+        .into()
     }
 }
 
@@ -129,11 +140,11 @@ macro_rules! make_partial {
         }
 
         impl PartialWave for $partial_name {
-            type Target<W: Wave> = $target<W>;
+            type Target<W: Wave + Clone + Send + Sync> = $target<W>;
 
             fn build<W>(self, input: W) -> WaveGenerator<Self::Target<W>>
             where
-                W: Wave,
+                W: Wave + Clone + Send + Sync,
             {
                 $target::new($(self.$field_name,)* input)
             }
