@@ -106,6 +106,7 @@ where
 /// use rust_audio_shenanigans::wave::{Wave, WaveGenerator};
 /// use rust_audio_shenanigans::waves::{constant, sine};
 ///
+/// #[derive(Clone)]
 /// pub struct MyWave<T> { mul: f64, input: T }
 ///
 /// impl<W> MyWave<W> where W: Wave {
