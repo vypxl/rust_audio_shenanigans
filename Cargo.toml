@@ -5,6 +5,9 @@ edition = "2021"
 
 [dependencies]
 cpal = "0.15.2"
+eframe = "0.24.1"
+egui = "0.24.1"
+egui_file = "0.13.0"
 midly = "0.5.3"
 tokio = { version = "1.29.1", features = ["rt-multi-thread", "macros", "sync"] }
 
